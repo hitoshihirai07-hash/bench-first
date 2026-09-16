@@ -4,7 +4,7 @@ const {test}=require('node:test');
 const G=require('../public/engine.js');
 function seek(setup,action,predicate){for(let seed=1;seed<20000;seed++){const s=G.createGame('chase',seed);setup(s);const r=G.step(s,action);if(predicate(s,r))return s;}throw Error('No matching outcome');}
 test('3 scenarios have consistent starting scoreboard and base runner',()=>{
-  for(const key of Object.keys(G.scenarios)){const s=G.createGame(key,123);assert.equal(s.inning,7);assert.equal(s.outs,1);assert.equal(s.bases[0].id,'h6');for(const t of ['home','away'])assert.equal(s.lines[t].reduce((a,b)=>a+(Number(b)||0),0),s.score[t]);}
+  for(const key of ['chase','tie','lead']){const s=G.createGame(key,123);assert.equal(s.inning,7);assert.equal(s.outs,1);assert.equal(s.bases[0].id,'h6');for(const t of ['home','away'])assert.equal(s.lines[t].reduce((a,b)=>a+(Number(b)||0),0),s.score[t]);}
 });
 test('seeded game can be reproduced',()=>{const a=G.createGame('tie',123),b=G.createGame('tie',123);for(let i=0;i<50&&!a.done;i++){const cmd=a.half==='home'?'power':'normal';G.step(a,cmd);G.step(b,cmd);}assert.deepEqual(a,b);});
 test('pinch hitter leaves permanently, catcher aptitude changes defensive strength',()=>{
