@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ee682b">
+  <title>ベンチからの一手｜プロ野球観戦メモ</title>
+  <meta name="description" content="代打、継投、走塁。あなたならどうする？7回から指揮を執る、無料のブラウザ野球采配ゲーム。PC・スマホ対応。">
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./engine.js" defer></script><script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="header"><div class="brand"><img src="./assets/icon.svg" alt="" width="36" height="36"><h1>ベンチからの一手</h1><span class="tagline">采配で、もうひとつのドラマを。</span></div><div class="header-actions"><button id="help" class="small-button">遊び方</button><button id="restart" class="small-button orange-outline">はじめから</button></div></header>
+  <main>
+    <section id="scoreboard" class="scoreboard" aria-label="試合状況"></section>
+    <div class="game-layout">
+      <section class="field-panel" aria-label="球場と対戦選手">
+        <div class="field" id="field"><img class="stadium" src="./assets/stadium.png" alt="緑の外野と土の内野が広がる球場"><div id="field-state"></div><div id="play-flash" aria-hidden="true"></div></div>
+        <div id="matchup" class="matchup"></div>
+      </section>
+      <section class="command-panel" aria-label="監督の采配">
+        <div class="command-heading"><h2 id="command-title">あなたの采配で、<br>流れを変える。</h2><span id="phase" class="phase"></span></div>
+        <div class="tabs" role="tablist" aria-label="表示切り替え"><button role="tab" id="tab-tactics" data-tab="tactics" aria-controls="panel" aria-selected="true">采配</button><button role="tab" id="tab-bench" data-tab="bench" aria-controls="panel" aria-selected="false">ベンチ</button><button role="tab" id="tab-record" data-tab="record" aria-controls="panel" aria-selected="false">記録</button></div>
+        <div id="panel" role="tabpanel" aria-labelledby="tab-tactics"></div>
+      </section>
+    </div>
+    <section class="recent"><h2>最近のプレー</h2><div id="recent" aria-live="polite" aria-atomic="true"></div></section>
+    <footer><a href="https://pro-baseball-watch-guide.com/" target="_blank" rel="noopener">プロ野球観戦メモ</a><span>架空の球団・選手によるゲーム · 試作版 0.1</span><span id="save-status"></span></footer>
+  </main>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+  <div id="toast" role="status"></div>
+  <noscript>このゲームを遊ぶには、ブラウザのJavaScriptを有効にしてください。</noscript>
+</body>
+</html>
