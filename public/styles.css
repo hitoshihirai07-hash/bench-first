@@ -16,3 +16,8 @@
 @media(max-width:370px){.command-heading h2{font-size:13px}.phase{font-size:8px;padding:5px}.next-batter button{font-size:10px}.next-batter>span{font-size:8px}.mini-stats{gap:4px}.lineup-table small{font-size:8px}.lineup-table .player-link{font-size:10px}}
 
 .dialog-actions .small-button{flex-shrink:0;white-space:nowrap;min-width:64px}.dialog-actions .primary{min-width:0;flex:1}
+
+/* v0.3 sharing surfaces */
+.link-toolbar-button{border:1px solid var(--line);background:white;border-radius:7px;padding:6px 12px;font-size:12px;min-height:36px;font-weight:700;flex-shrink:0}
+.link-label{display:block;font-size:12px;font-weight:700;margin:16px 0 6px}.link-select{width:100%;min-width:0;border:1px solid var(--line);border-radius:7px;background:white;padding:8px;color:var(--ink);font-size:13px}.link-value{width:100%;height:84px;resize:none;border:1px solid var(--line);border-radius:7px;padding:10px;font-size:13px;overflow-wrap:anywhere;margin-bottom:12px}#link-description{margin-top:12px}.result-image{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:8px;margin:12px 0}.image-download{display:flex;justify-content:center;align-items:center;text-decoration:none}.image-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}.result-buttons .small-button{padding:9px 8px}.result-buttons #result-png{grid-column:1/-1}.result-buttons #result-record{grid-column:1/-1;background:var(--paper)}
+@media(max-width:600px){.link-toolbar-button{font-size:10px;padding:4px 9px;min-height:32px}.image-actions{grid-template-columns:1fr}.game-toolbar{gap:6px}}

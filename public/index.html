@@ -5,15 +5,31 @@
   <meta name="theme-color" content="#ee682b">
   <title>ベンチからの一手｜プロ野球観戦メモ</title>
   <meta name="description" content="代打、継投、走塁。あなたならどうする？終盤の勝負どころで指揮を執る、無料のブラウザ野球采配ゲーム。PC・スマホ対応。">
+  <link rel="canonical" href="https://bench-first.pages.dev/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ja_JP">
+  <meta property="og:site_name" content="ベンチからの一手">
+  <meta property="og:title" content="ベンチからの一手｜あなたなら、どう采配する？">
+  <meta property="og:description" content="代打か、続投か。終盤の勝負どころを指揮する野球ゲーム。PC・スマホで遊べる、今日の共通のお題に挑戦。">
+  <meta property="og:url" content="https://bench-first.pages.dev/">
+  <meta property="og:image" content="https://bench-first.pages.dev/assets/ogp-v03.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ベンチからの一手。代打か、続投か。あなたなら、どう采配する？">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ベンチからの一手｜あなたなら、どう采配する？">
+  <meta name="twitter:description" content="終盤の勝負どころを指揮する野球ゲーム。今日の共通のお題に挑戦。">
+  <meta name="twitter:image" content="https://bench-first.pages.dev/assets/ogp-v03.png">
+  <meta name="twitter:image:alt" content="ベンチからの一手。代打か、続投か。あなたなら、どう采配する？">
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=02">
-  <script src="./engine.js?v=02" defer></script><script src="./motion.js?v=02" defer></script><script src="./app.js?v=02" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=03">
+  <script src="./engine.js?v=03" defer></script><script src="./motion.js?v=03" defer></script><script src="./sharing.js?v=03" defer></script><script src="./app.js?v=03" defer></script>
 </head>
 <body>
   <header class="header"><div class="brand"><img src="./assets/icon.svg" alt="" width="36" height="36"><h1>ベンチからの一手</h1><span class="tagline">采配で、もうひとつのドラマを。</span></div><div class="header-actions"><button id="help" class="small-button">遊び方</button><button id="restart" class="small-button orange-outline">はじめから</button></div></header>
   <main>
     <section id="scoreboard" class="scoreboard" aria-label="試合状況"></section>
-    <div class="game-toolbar"><button id="daily" class="daily-button">今日の共通のお題</button><span id="challenge-label"></span><label class="speed-control">演出 <select id="animation-speed" aria-label="演出の速さ"><option value="normal">標準</option><option value="fast">速い</option><option value="none">なし</option></select></label></div>
+    <div class="game-toolbar"><button id="daily" class="daily-button">今日の共通のお題</button><button id="share-links" class="link-toolbar-button" aria-label="お題へのリンクを作る">リンク</button><span id="challenge-label"></span><label class="speed-control">演出 <select id="animation-speed" aria-label="演出の速さ"><option value="normal">標準</option><option value="fast">速い</option><option value="none">なし</option></select></label></div>
     <div class="game-layout">
       <section class="field-panel" aria-label="球場と対戦選手">
         <div class="field" id="field"><img class="stadium" src="./assets/stadium.png" alt="緑の外野と土の内野が広がる球場"><div id="field-state"></div><div id="motion-layer" aria-hidden="true"></div><div id="play-flash" aria-hidden="true"></div></div>
@@ -27,7 +43,7 @@
       </section>
     </div>
     <section class="recent"><h2>最近のプレー</h2><div id="recent" aria-live="polite" aria-atomic="true"></div></section>
-    <footer><a href="https://pro-baseball-watch-guide.com/" target="_blank" rel="noopener">プロ野球観戦メモ</a><span>架空の球団・選手によるゲーム · 試作版 0.2</span><span id="save-status"></span></footer>
+    <footer><a href="https://pro-baseball-watch-guide.com/" target="_blank" rel="noopener">プロ野球観戦メモ</a><span>架空の球団・選手によるゲーム · 試作版 0.3</span><span id="save-status"></span></footer>
   </main>
   <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
   <div id="toast" role="status"></div>

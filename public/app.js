@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  const G=window.BenchGame,$=id=>document.getElementById(id);
+  const G=window.BenchGame,S=window.BenchSharing,$=id=>document.getElementById(id);
   const GAME_KEY='bench-first-game-v1',HISTORY_KEY='bench-first-history-v1',PREF_KEY='bench-first-prefs-v2';
   let game,tab='tactics',selected='contact',busy=false,benchMode='pinch',benchTarget=7,storageOK=true,toastTimer,lineupTeam='home';
-  let animationSpeed='normal';
+  let animationSpeed='normal',imageURL=null,imageJob=0;
   const icons={
     contact:'<path d="m6 20 11-13 3 3L8 22zM17 7l2-3 3 3-2 3M5 22l-2-2"/>',
     power:'<path d="m3 21 11-11 4 4L7 23zM14 10l4-7 5 5-5 6M4 6l2-3m1 5 3-1m9 12 2 2"/>',
@@ -124,7 +124,7 @@
       render();if(game.done)showResult();else $('advance')?.focus({preventScroll:true});
     }
   }
-  function openDialog(html){$('dialog-content').innerHTML=html;if(!$('dialog').open)$('dialog').showModal();const close=$('close-dialog');if(close)close.onclick=()=>$('dialog').close();}
+  function openDialog(html){clearImage();$('dialog-content').innerHTML=html;if(!$('dialog').open)$('dialog').showModal();const close=$('close-dialog');if(close)close.onclick=()=>$('dialog').close();}
   function dialogHead(title){return '<div class="dialog-header"><h2 id="dialog-title">'+title+'</h2><button class="close-button" id="close-dialog" aria-label="閉じる">×</button></div>';}
   function showConfirm(title,text,fn,extra=''){openDialog(dialogHead(title)+'<p class="dialog-text">'+esc(text)+'</p>'+extra+'<div class="dialog-actions"><button id="cancel" class="small-button">戻る</button><button id="confirm" class="primary">交代する</button></div>');$('cancel').onclick=()=>$('dialog').close();$('confirm').onclick=()=>{$('dialog').close();fn();};}
   function renderChallengeLabel(){
@@ -138,26 +138,63 @@
   }
   function showSetup(){if(busy)return;openDialog(dialogHead('どの試合を指揮する？')+'<p class="dialog-text">あなたは後攻のサンライズ。選んだ場面から9回終了まで指揮します。'+(!game.done?'開始すると進行中の試合は終了します。':'')+'</p><button id="setup-daily" class="daily-button setup-daily">今日の共通のお題で遊ぶ</button><div class="scenario-list">'+Object.entries(G.scenarios).map(([k,s])=>'<button class="scenario" data-scenario="'+k+'"><span><strong>'+s.name+'</strong><small>'+s.text+'</small></span><span class="num">'+s.home+' − '+s.away+'</span></button>').join('')+'</div><p class="record-caption">左があなたのチーム。自由に挑戦するモードでは結果は毎回変わります。</p>');document.querySelectorAll('[data-scenario]').forEach(el=>el.onclick=()=>newGame(el.dataset.scenario));$('setup-daily').onclick=showDaily;}
   function newGame(scenario,dailyDate=null){
+    clearEntry();
     const attempt=String(Date.now())+'-'+Math.floor(Math.random()*100000);
     game=dailyDate?G.createDailyGame(dailyDate,attempt):G.createGame(scenario,Date.now()+Math.floor(Math.random()*100000));
     selected=game.half==='home'?'contact':'normal';tab='tactics';lineupTeam=game.half;benchMode=game.half==='home'?'pinch':'pitcher';benchTarget=game.teams.home.order;$('dialog').close();render();window.scrollTo({top:0,behavior:'instant'});
   }
-  function showHelp(){openDialog(dialogHead('監督の仕事は、選ぶこと。')+'<div class="dialog-text"><p><strong>あなたは後攻のサンライズ。選んだ場面から9回終了までを戦います。</strong>打撃・投球のタイミング操作はありません。</p><ol><li>「采配」で作戦を選び、<strong>この作戦で進める</strong>を押すと1打席が進みます。</li><li>3アウトで攻守交代。守備では投球方針を選びます。</li><li>「ベンチ」で代打・代走・継投・守備交代。交代は確認後に確定します。</li><li>「打順」で両チームの打順を確認。選手名を押すと全能力が開きます。</li><li>「記録」でスコアと采配を振り返れます。</li></ol><p><strong>能力は100段階。</strong>ミート・長打・走力・守備・選球眼・バント、投手の球威・制球・疲労・左右相性が結果に影響します。良い選択でも必ず成功するわけではありません。</p><p><strong>守備適性に注意。</strong>例えば控え捕手を代打に使うと、打力が上がっても捕手の守備力が下がります。投手の疲労は球数とスタミナで増加します。</p><p>試作版は全試合DH制。送りバントは2死・三塁走者ありでは不可、盗塁は二盗・三盗のみです。走塁・併殺は簡略化しています。実際の試合を予測するものではありません。</p><p>「今日の共通のお題」は日本時間の日付で切り替わります。同じ版・同じお題・同じ采配なら結果を再現できます。演出は標準／速い／なしから選べます。端末で動きを減らす設定をしている場合も演出を省略します。</p><p>進行と直近100試合の戦績をこの端末に保存します。ブラウザのデータ削除で消えます。公開URLとローカルファイルの保存は別です。</p></div><button class="primary" id="help-done">采配を始めよう</button>');$('help-done').onclick=()=>$('dialog').close();}
-  function shareText(){
-    const daily=game.daily;const attempts=daily?history().filter(x=>x.daily?.code===daily.code):[];
-    const attemptNo=attempts.findIndex(x=>x.id===game.id)+1;
-    return 'ベンチからの一手 v0.2｜'+(daily?'共通のお題 '+daily.code+'（'+(attemptNo>0?'保存記録内'+attemptNo+'回目':'再挑戦')+'）':'自由に挑戦')+'\n'+G.scenarios[game.scenario].name+'\nサンライズ '+game.score.home+' − '+game.score.away+' ブルーウェーブ\n'+({win:'勝利！',loss:'惜しくも敗戦。',draw:'引き分け。'}[game.result])+' あなたならどう采配する？\nhttps://bench-first.pages.dev/\n#ベンチからの一手 #プロ野球観戦メモ';
+  function showHelp(){openDialog(dialogHead('監督の仕事は、選ぶこと。')+'<div class="dialog-text"><p><strong>あなたは後攻のサンライズ。選んだ場面から9回終了までを戦います。</strong>打撃・投球のタイミング操作はありません。</p><ol><li>「采配」で作戦を選び、<strong>この作戦で進める</strong>を押すと1打席が進みます。</li><li>3アウトで攻守交代。守備では投球方針を選びます。</li><li>「ベンチ」で代打・代走・継投・守備交代。交代は確認後に確定します。</li><li>「打順」で両チームの打順を確認。選手名を押すと全能力が開きます。</li><li>「記録」でスコアと采配を振り返れます。</li></ol><p><strong>能力は100段階。</strong>ミート・長打・走力・守備・選球眼・バント、投手の球威・制球・疲労・左右相性が結果に影響します。良い選択でも必ず成功するわけではありません。</p><p><strong>守備適性に注意。</strong>例えば控え捕手を代打に使うと、打力が上がっても捕手の守備力が下がります。投手の疲労は球数とスタミナで増加します。</p><p>試作版は全試合DH制。送りバントは2死・三塁走者ありでは不可、盗塁は二盗・三盗のみです。走塁・併殺は簡略化しています。実際の試合を予測するものではありません。</p><p>「今日の共通のお題」は日本時間の日付で切り替わります。同じ版・同じお題・同じ采配なら結果を再現できます。演出は標準／速い／なしから選べます。端末で動きを減らす設定をしている場合も演出を省略します。</p><p>「リンク」から今日・指定日・シナリオのリンクをコピーできます。試合終了後は結果のコピー・対応端末の共有・PNG画像の保存ができます。</p><p>進行と直近100試合の戦績をこの端末に保存します。ブラウザのデータ削除で消えます。公開URLとローカルファイルの保存は別です。</p></div><button class="primary" id="help-done">采配を始めよう</button>');$('help-done').onclick=()=>$('dialog').close();}
+  function shareText(){return S.text(S.resultData(game,G));}
+  async function copyText(value){
+    try{await navigator.clipboard.writeText(value);toast('コピーしました。');}
+    catch{let el=$('share-fallback');if(!el){$('dialog-content').insertAdjacentHTML('beforeend','<label class="record-caption" for="share-fallback">下の文章を選択してコピーしてください。</label><textarea id="share-fallback" class="share-text" readonly></textarea>');el=$('share-fallback');}el.value=value;el.focus();el.select();}
+  }
+  async function nativeShare(data,button){
+    if(button)button.disabled=true;
+    const status=await S.share(navigator,data);
+    if(button)button.disabled=false;
+    if(status==='fallback'){toast('共有メニューを開けませんでした。コピーをご利用ください。');let el=$('share-fallback');if(!el){$('dialog-content').insertAdjacentHTML('beforeend','<label class="record-caption" for="share-fallback">共有する文章</label><textarea id="share-fallback" class="share-text" readonly></textarea>');el=$('share-fallback');}el.value=S.text(data);}
+  }
+  function clearImage(){imageJob++;if(imageURL){URL.revokeObjectURL(imageURL);imageURL=null;}}
+  async function showImage(){
+    const snapshot=JSON.parse(JSON.stringify(game));
+    openDialog(dialogHead('結果画像を保存')+'<div id="image-content" aria-live="polite"><p class="dialog-text">画像を作成しています…</p></div>');
+    const job=imageJob;
+    try{
+      const output=await S.card(snapshot,G);if(job!==imageJob||!$('dialog').open)return;
+      imageURL=URL.createObjectURL(output.blob);
+      $('image-content').innerHTML='<img id="result-image" class="result-image" alt="'+esc(G.scenarios[snapshot.scenario].name)+'の結果。サンライズ '+snapshot.score.home+'対ブルーウェーブ '+snapshot.score.away+'"><a id="download-image" class="primary image-download">PNG画像を保存</a><p class="record-caption">保存が始まらない端末では、画像を長押しして保存できます。SNSには下の結果文・リンクも添えてください。</p><div class="image-actions"><button id="image-copy" class="small-button">結果文とリンクをコピー</button><button id="image-back" class="small-button">結果に戻る</button></div>';
+      $('result-image').src=imageURL;$('download-image').href=imageURL;$('download-image').download=output.name;
+      $('image-copy').onclick=()=>copyText(S.text(S.resultData(snapshot,G)));$('image-back').onclick=showResult;
+    }catch{if(job!==imageJob||!$('dialog').open)return;$('image-content').innerHTML='<p class="dialog-text">画像を作成できませんでした。結果のコピーをご利用ください。</p><button id="image-back" class="primary">結果に戻る</button>';$('image-back').onclick=showResult;}
+  }
+  function showLinks(){
+    if(busy)return;
+    openDialog(dialogHead('お題へのリンク')+'<p class="dialog-text">記事やSNSから、遊んでほしい場面へ案内できます。</p><label class="link-label" for="link-kind">リンクの種類</label><select id="link-kind" class="link-select"><option value="today">今日のお題（開いた日のお題）</option><option value="daily">日付指定のお題</option><option value="scenario">シナリオ指定</option></select><div id="link-options"></div><p id="link-description" class="dialog-text"></p><label class="link-label" for="link-value">共有するリンク</label><textarea id="link-value" class="link-value" readonly></textarea><button id="copy-link" class="primary">リンクをコピー</button><p class="record-caption">リンク先では場面を確認してから開始できます。シナリオ指定は開始状況が共通で、抽選は毎回変わります。</p>');
+    function update(){const kind=$('link-kind').value;try{let value=kind==='today'?null:kind==='daily'?$('link-date').value:$('link-scene').value;if(kind==='daily'&&!/^20\d{2}-\d{2}-\d{2}$/.test(value))throw Error();if(kind==='daily')G.dailySpec(value);$('link-value').value=S.link(kind,value);$('copy-link').disabled=false;$('link-description').textContent=kind==='today'?'いつ開いても、その日の共通のお題です。':kind==='daily'?'後日開いても、指定した日と同じ条件で遊べます。':G.scenarios[value].text;}catch{$('link-value').value='';$('copy-link').disabled=true;$('link-description').textContent='有効な日付を選んでください。';}}
+    function options(){const kind=$('link-kind').value;$('link-options').innerHTML=kind==='daily'?'<label class="link-label" for="link-date">お題の日付（日本時間）</label><input id="link-date" class="link-select" type="date" min="2000-01-01" max="2099-12-31" value="'+(game.daily?.date||G.japanDate())+'">':kind==='scenario'?'<label class="link-label" for="link-scene">開始場面</label><select id="link-scene" class="link-select">'+Object.entries(G.scenarios).map(([key,sc])=>'<option value="'+key+'" '+(key===game.scenario?'selected':'')+'>'+sc.name+'</option>').join('')+'</select>':'';if($('link-date'))$('link-date').oninput=update;if($('link-scene'))$('link-scene').onchange=update;update();}
+    $('link-kind').onchange=options;$('copy-link').onclick=()=>copyText($('link-value').value);options();
+  }
+  function clearEntry(){try{const u=new URL(location.href);['daily','scenario','rules'].forEach(k=>u.searchParams.delete(k));window.history.replaceState(null,'',u.href);}catch{}}
+  function showEntry(){
+    const entry=S.parse(location.search,G);if(!entry)return;
+    clearEntry();
+    if(entry.error){openDialog(dialogHead('リンクを確認してください')+'<p class="dialog-text">'+esc(entry.error)+'</p><button id="entry-close" class="primary">今の試合に戻る</button>');$('entry-close').onclick=()=>$('dialog').close();return;}
+    const d=entry.kind==='today'?G.dailySpec():entry.kind==='daily'?entry:null;
+    const scenario=d?d.scenario:entry.scenario,sc=G.scenarios[scenario];
+    openDialog(dialogHead(d?'共通のお題に挑戦':'この場面に挑戦')+(d?'<p class="challenge-date">'+d.date+' · お題 '+d.code+'</p>':'')+'<div class="daily-card"><h3>'+sc.name+'</h3><p>'+sc.text+'</p><strong>サンライズ '+sc.home+' − '+sc.away+' ブルーウェーブ</strong></div><p class="dialog-text">'+(d?'同じお題・同じ采配なら結果を再現できます。':'この場面から始めます。抽選は毎回変わります。')+'</p>'+(!game.done?'<p class="dialog-text warning">開始すると進行中の試合を置き換えます。閉じると今の試合に戻れます。</p>':'')+'<div class="dialog-actions"><button id="entry-close" class="small-button">戻る</button><button id="entry-start" class="primary">挑戦する</button></div>');
+    $('entry-close').onclick=()=>$('dialog').close();$('entry-start').onclick=()=>{const now=entry.kind==='today'?G.dailySpec():d;newGame(now?now.scenario:scenario,now?now.date:null);};
   }
   function showResult(){
     if(!game.done)return;const h=history(),count=r=>h.filter(x=>x.result===r).length;
     const moments=game.log.filter(l=>l.kind==='decision'||l.kind==='score'||l.kind==='hr').slice(-3);
-    openDialog(dialogHead({win:'サンライズ、勝利！',loss:'あと一歩、届かず。',draw:'9回終了、引き分け。'}[game.result])+(game.daily?'<p class="challenge-date">共通のお題 '+game.daily.code+'</p>':'')+'<div class="result-score">'+game.score.home+' − '+game.score.away+'<small>サンライズ 対 ブルーウェーブ</small></div><p class="dialog-text">'+resultTitle()+'</p><div class="result-notes"><h3>試合の分岐点</h3>'+(moments.length?moments.map(m=>'<p>'+m.half+' '+esc(m.text)+'</p>').join(''):'<p>両チームとも終盤の守備で粘りました。</p>')+'</div><p class="record-caption">結果だけで采配の良し悪しは決まりません。選手の特徴や残り戦力も振り返ってみましょう。</p><div class="record-totals">この端末の戦績：'+count('win')+'勝 '+count('loss')+'敗 '+count('draw')+'分（直近'+h.length+'試合）</div><div class="result-buttons"><button id="replay" class="primary">同じ場面でもう一度</button><button id="share" class="small-button">結果をコピー</button><button id="result-record" class="small-button">試合記録を見る</button></div><p class="record-caption">'+(game.daily?'このお題は同じ采配なら同じ結果。選び方を変えて再挑戦できます。':'自由に挑戦するモードでは、結果は毎回変わります。')+'</p>');
-    $('replay').onclick=()=>newGame(game.scenario,game.daily?.date||null);$('result-record').onclick=()=>{$('dialog').close();switchTab('record');};$('share').onclick=async()=>{try{await navigator.clipboard.writeText(shareText());toast('結果をコピーしました。');}catch{if(!$('share-fallback')){$('dialog-content').insertAdjacentHTML('beforeend','<label class="record-caption" for="share-fallback">下の文章を選択してコピーしてください。</label><textarea id="share-fallback" class="share-text" readonly>'+esc(shareText())+'</textarea>');}$('share-fallback').select();}};
+    openDialog(dialogHead({win:'サンライズ、勝利！',loss:'あと一歩、届かず。',draw:'9回終了、引き分け。'}[game.result])+(game.daily?'<p class="challenge-date">共通のお題 '+game.daily.code+'</p>':'')+'<div class="result-score">'+game.score.home+' − '+game.score.away+'<small>サンライズ 対 ブルーウェーブ</small></div><p class="dialog-text">'+resultTitle()+'</p><div class="result-notes"><h3>試合の分岐点</h3>'+(moments.length?moments.map(m=>'<p>'+m.half+' '+esc(m.text)+'</p>').join(''):'<p>両チームとも終盤の守備で粘りました。</p>')+'</div><p class="record-caption">結果だけで采配の良し悪しは決まりません。選手の特徴や残り戦力も振り返ってみましょう。</p><div class="record-totals">この端末の戦績：'+count('win')+'勝 '+count('loss')+'敗 '+count('draw')+'分（直近'+h.length+'試合）</div><div class="result-buttons"><button id="replay" class="primary">同じ場面でもう一度</button><button id="share" class="small-button">結果をコピー</button>'+(S.canNative(navigator,S.resultData(game,G))?'<button id="native-share" class="small-button">結果をシェア</button>':'')+'<button id="result-png" class="small-button">結果画像を保存</button><button id="result-record" class="small-button">試合記録を見る</button></div><p class="record-caption">'+(game.daily?'このお題は同じ采配なら同じ結果。選び方を変えて再挑戦できます。':'自由に挑戦するモードでは、結果は毎回変わります。')+'</p>');
+    $('replay').onclick=()=>newGame(game.scenario,game.daily?.date||null);$('result-record').onclick=()=>{$('dialog').close();switchTab('record');};$('share').onclick=()=>copyText(shareText());if($('native-share'))$('native-share').onclick=()=>nativeShare(S.resultData(game,G),$('native-share'));$('result-png').onclick=showImage;
   }
   function toast(text){clearTimeout(toastTimer);$('toast').textContent=text;$('toast').className='visible';toastTimer=setTimeout(()=>$('toast').className='',2600);}
-  $('help').onclick=()=>{if(!busy)showHelp();};$('restart').onclick=showSetup;$('daily').onclick=showDaily;
+  $('help').onclick=()=>{if(!busy)showHelp();};$('restart').onclick=showSetup;$('daily').onclick=showDaily;$('share-links').onclick=showLinks;$('dialog').addEventListener('close',()=>{if(!$('dialog').open)clearImage();});
   const prefs=read(PREF_KEY,{});animationSpeed=['normal','fast','none'].includes(prefs?.speed)?prefs.speed:'normal';
   $('animation-speed').onchange=e=>{animationSpeed=e.target.value;try{localStorage.setItem(PREF_KEY,JSON.stringify({speed:animationSpeed}));}catch{storageOK=false;}save();};
   document.querySelectorAll('[data-tab]').forEach(el=>{el.onclick=()=>switchTab(el.dataset.tab);el.onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=['tactics','bench','lineup','record'];let i=tabs.indexOf(tab);i=e.key==='Home'?0:e.key==='End'?3:(i+(e.key==='ArrowRight'?1:3))%4;switchTab(tabs[i]);$('tab-'+tabs[i]).focus();};});
-  game=loadGame();lineupTeam=game.half;if(game.done)remember();render();
+  game=loadGame();lineupTeam=game.half;if(game.done)remember();render();showEntry();
 })();
