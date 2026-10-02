@@ -22,7 +22,7 @@
     if(s&&[1,G.VERSION].includes(s.version)&&G.scenarios[s.scenario]&&s.inning>=7&&s.inning<=9&&['home','away'].includes(s.half)&&s.outs>=0&&s.outs<3&&s.bases.length===3&&Array.isArray(s.log)&&Array.isArray(s.decisions)&&Number.isFinite(s.rng)&&['home','away'].every(k=>Number.isFinite(s.score[k])&&s.lines[k].length===9&&s.teams[k].lineup.length===9&&s.teams[k].pitchers[s.teams[k].pitcherIndex]&&Array.isArray(s.teams[k].bench))){G.currentBatter(s);G.currentPitcher(s);s.version=G.VERSION;hasSavedGame=true;return s;}
     }catch{}return G.createGame();}
   function history(){const h=read(HISTORY_KEY,[]);return Array.isArray(h)?h.filter(x=>x&&['win','loss','draw'].includes(x.result)).slice(-100):[];}
-  function remember(){const h=history();if(h.some(x=>x.id===game.id))return;h.push({id:game.id,result:game.result,home:game.score.home,away:game.score.away,scenario:game.scenario,date:new Date().toISOString(),daily:game.daily||null});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-100)));}catch{storageOK=false;}}
+  function remember(){const h=history();if(h.some(x=>x.id===game.id))return;h.push({id:game.id,result:game.result,home:game.score.home,away:game.score.away,scenario:game.scenario,date:new Date().toISOString(),daily:game.daily||null,balanceRevision:game.balanceRevision||null});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-100)));}catch{storageOK=false;}}
   function baseText(){return game.bases.some(Boolean)?game.bases.map((p,i)=>p?['一','二','三'][i]:'').join('')+'塁':'走者なし';}
   function fatigueText(p){const f=G.fatigue(p);return f>=1?'疲労 大':f>=.8?'疲労 やや大':f>=.55?'疲労 中':'疲労 小';}
   function resultTitle(){return game.result==='win'?'采配が、勝利につながった。':game.result==='loss'?'次の一手で、取り返そう。':'最後まで、譲らない戦い。';}
@@ -70,6 +70,11 @@
       ['low','低めで勝負','長打を抑えてゴロを狙う。','本塁打減。四球は増える。',true]
     ];
     if(!choices.some(c=>c[0]===selected&&c[4]))selected=offense?'contact':'normal';
+    for(const c of choices){
+      if(['bunt','steal'].includes(c[0]))continue;
+      const p=G.matchupProbabilities(game,c[0]),hit=p.single+p.double+p.triple+p.hr,pct=v=>Math.round(v*100)+'%';
+      c[3]+='<br><span class="chance-preview">'+(offense?'出塁目安 '+pct(hit+p.bb+p.error)+' · 本塁打 '+pct(p.hr):'被安打 '+pct(hit)+' · 三振 '+pct(p.k)+' · 四球 '+pct(p.bb))+'</span>';
+    }
     $('panel').innerHTML='<div class="tactics">'+choices.map(c=>'<button class="tactic '+(selected===c[0]?'selected':'')+'" data-action="'+c[0]+'" aria-pressed="'+(selected===c[0])+'" '+(!c[4]?'disabled':'')+'><div class="tactic-top">'+icon(c[0])+'<h3>'+c[1]+'</h3></div><p>'+c[2]+'</p><p class="pro">'+c[3]+'</p></button>').join('')+'</div>'+(offense?'':'<div class="defense-select"><span>守備位置</span><button data-defense="normal" class="'+(game.defense==='normal'?'selected':'')+'" aria-pressed="'+(game.defense==='normal')+'">定位置</button><button data-defense="in" class="'+(game.defense==='in'?'selected':'')+'" aria-pressed="'+(game.defense==='in')+'">前進守備</button></div>')+'<p class="action-hint">'+(offense?(selected==='bunt'?'送りバントは2死・三塁走者ありでは選べません。失敗時は打者アウト。':selected==='steal'?'盗塁は打席を消費しません。失敗するとアウトが増えます。':'「ベンチ」から代打・代走を選べます。交代後は再出場できません。'):(game.defense==='in'?'前進守備は内野ゴロでの生還を防ぎますが、安打が増えます。':'疲労が大きいほど打たれやすくなります。「ベンチ」で継投できます。'))+'</p><div class="primary-row"><button class="primary" id="advance" '+(busy?'disabled':'')+'>'+(busy?'プレー中…':'この作戦で進める')+'<span class="arrow" aria-hidden="true">→</span></button></div>';
     document.querySelectorAll('[data-action]').forEach(el=>el.onclick=()=>{selected=el.dataset.action;renderTactics();document.querySelector('[data-action="'+selected+'"]').focus({preventScroll:true});});
     document.querySelectorAll('[data-defense]').forEach(el=>el.onclick=()=>{G.setDefense(game,el.dataset.defense);save();render();});
@@ -130,7 +135,7 @@
   function dialogHead(title){return '<div class="dialog-header"><h2 id="dialog-title">'+title+'</h2><button class="close-button" id="close-dialog" aria-label="閉じる">×</button></div>';}
   function showConfirm(title,text,fn,extra=''){openDialog(dialogHead(title)+'<p class="dialog-text">'+esc(text)+'</p>'+extra+'<div class="dialog-actions"><button id="cancel" class="small-button">戻る</button><button id="confirm" class="primary">交代する</button></div>');$('cancel').onclick=()=>$('dialog').close();$('confirm').onclick=()=>{$('dialog').close();fn();};}
   function renderChallengeLabel(){
-    $('challenge-label').textContent=game.daily?'共通のお題 '+game.daily.date+' · '+G.scenarios[game.scenario].name:'自由に挑戦 · '+G.scenarios[game.scenario].name;
+    $('challenge-label').textContent=game.daily?'共通のお題 '+game.daily.date+' · '+G.scenarios[game.scenario].name+(game.balanceRevision!==G.BALANCE_REVISION?' · 以前の保存位置':''):'自由に挑戦 · '+G.scenarios[game.scenario].name;
     $('animation-speed').value=animationSpeed;
   }
   function difficultyHTML(sc){return '<span class="difficulty" aria-label="難易度5段階中'+sc.difficulty+'">難易度 '+'★'.repeat(sc.difficulty)+'☆'.repeat(5-sc.difficulty)+'</span>';}
@@ -141,8 +146,8 @@
     $('scene-back').onclick=showSetup;$('scene-start').onclick=()=>newGame(scenario);
   }
   function showDaily(){
-    if(busy)return;const d=G.dailySpec(),sc=G.scenarios[d.scenario],past=history().filter(x=>x.daily?.code===d.code),first=past[0];
-    openDialog(dialogHead('今日の共通のお題')+'<p class="challenge-date">'+d.date+' · お題 '+d.code+'</p><div class="daily-card"><h3>'+sc.name+'</h3>'+difficultyHTML(sc)+'<p>'+sc.text+'</p><strong>サンライズ '+sc.home+' − '+sc.away+' ブルーウェーブ</strong></div><div class="dialog-text"><p>日本時間の毎日0時にお題が切り替わります。同じ版・同じお題では、開始条件と抽選の並びが共通です。<strong>同じ采配なら同じ結果</strong>になり、選び方を変えて再挑戦できます。</p><p>保存中の完了記録：'+past.length+'回'+(first?' / 記録内の初回：'+({win:'勝利',loss:'敗戦',draw:'引き分け'}[first.result])+'（'+first.home+' − '+first.away+'）':' / 完了記録なし')+'（直近100試合内）</p><p>結果をコピーして比べられます。全員の戦績を集計するオンラインランキングはありません。</p>'+(hasSavedGame&&!game.done?'<p class="warning">開始すると進行中の試合は終了します。</p>':'')+'</div><button class="primary" id="start-daily">同じ条件で挑戦する</button>');
+    if(busy)return;const d=G.dailySpec(),sc=G.scenarios[d.scenario],past=history().filter(x=>x.daily?.code===d.code&&x.daily?.balanceRevision===d.balanceRevision&&x.balanceRevision===G.BALANCE_REVISION),first=past[0];
+    openDialog(dialogHead('今日の共通のお題')+'<p class="challenge-date">'+d.date+' · お題 '+d.code+'</p><div class="daily-card"><h3>'+sc.name+'</h3>'+difficultyHTML(sc)+'<p>'+sc.text+'</p><strong>サンライズ '+sc.home+' − '+sc.away+' ブルーウェーブ</strong></div><div class="dialog-text"><p>日本時間の毎日0時にお題が切り替わります。同じ版・同じお題では、開始条件と抽選の並びが共通です。<strong>同じ采配なら同じ結果</strong>になり、選び方を変えて再挑戦できます。</p><p>この版のお題は、複数の采配で勝てることを確認して用意しています。作戦ごとの確率目安と、選手の能力・疲労を見て選びましょう。</p><p>保存中の完了記録：'+past.length+'回'+(first?' / 記録内の初回：'+({win:'勝利',loss:'敗戦',draw:'引き分け'}[first.result])+'（'+first.home+' − '+first.away+'）':' / 完了記録なし')+'（直近100試合内）</p><p>結果をコピーして比べられます。全員の戦績を集計するオンラインランキングはありません。</p>'+(hasSavedGame&&!game.done?'<p class="warning">開始すると進行中の試合は終了します。</p>':'')+'</div><button class="primary" id="start-daily">同じ条件で挑戦する</button>');
     $('start-daily').onclick=()=>newGame(d.scenario,d.date);
   }
   function showSetup(){if(busy)return;openDialog(dialogHead('どの試合を指揮する？')+'<p class="dialog-text">あなたは後攻のサンライズ。選んだ場面から9回終了まで指揮します。'+(hasSavedGame&&!game.done?'開始すると進行中の試合は終了します。':'')+'</p><button id="setup-daily" class="daily-button setup-daily">今日の共通のお題で遊ぶ</button><div class="scenario-list">'+Object.entries(G.scenarios).map(([k,s])=>'<button class="scenario" data-scenario="'+k+'"><span><strong>'+s.name+'</strong><small>'+s.text+'</small>'+difficultyHTML(s)+'</span><span class="num">'+s.home+' − '+s.away+'</span></button>').join('')+'</div><p class="record-caption">左があなたのチーム。自由に挑戦するモードでは結果は毎回変わります。</p>');document.querySelectorAll('[data-scenario]').forEach(el=>el.onclick=()=>showScenario(el.dataset.scenario));$('setup-daily').onclick=showDaily;}
@@ -207,6 +212,7 @@
   document.querySelectorAll('[data-tab]').forEach(el=>{el.onclick=()=>switchTab(el.dataset.tab);el.onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=['tactics','bench','lineup','record'];let i=tabs.indexOf(tab);i=e.key==='Home'?0:e.key==='End'?3:(i+(e.key==='ArrowRight'?1:3))%4;switchTab(tabs[i]);$('tab-'+tabs[i]).focus();};});
   game=loadGame();lineupTeam=game.half;
   $('choose-scenario').onclick=showSetup;$('start-today').onclick=showDaily;
+  $('saved-version-note').hidden=!hasSavedGame||game.balanceRevision===G.BALANCE_REVISION;
   $('resume-game').hidden=!hasSavedGame;$('resume-game').textContent=game.done?'保存した試合の記録を見る':'続きから遊ぶ';
   $('resume-game').onclick=()=>{selected=game.half==='home'?'contact':'normal';activateGame();if(game.done){remember();switchTab('record');}};
   showEntry();

@@ -44,6 +44,20 @@ try{
   const saved=await page();await start(saved,'tie');await saved.locator('#advance').click();await saved.waitForFunction(()=>!document.querySelector('#advance').disabled);const before=await snapshot(saved);await saved.reload();assert.equal(await saved.locator('#game-view').isVisible(),false);await saved.locator('#resume-game').click();assert.deepEqual(await snapshot(saved),before);flows++;
   const link=await page();await link.goto(url+'/?scenario=ace');assert.equal(await link.locator('#game-view').isVisible(),false);assert.match(await link.locator('#dialog-content').innerText(),/難易度/);await link.locator('#entry-start').click();assert.equal((await snapshot(link)).scenario,'ace');flows++;
   const daily=await page();await daily.goto(url+'/?daily=2026-09-16&rules=02');await daily.locator('#entry-start').click();assert.equal((await snapshot(daily)).daily.date,'2026-09-16');flows++;
+  const today=await page();await today.goto(url+'/?daily=2026-10-02&rules=02');await today.locator('#entry-start').click();await today.locator('#animation-speed').selectOption('none');
+  assert.equal((await snapshot(today)).daily.balanceRevision,'05');assert.match(await today.locator('#matchup').innerText(),/黒瀬/);
+  const starterPreview=await today.locator('[data-action="normal"] .chance-preview').innerText();
+  await today.locator('#tab-bench').click();await today.locator('[data-pitcher="1"]').click();await today.locator('#confirm').click();await today.locator('#tab-tactics').click();
+  assert.notEqual(await today.locator('[data-action="normal"] .chance-preview').innerText(),starterPreview);
+  for(let n=0;n<150;n++){
+    const s=await snapshot(today);if(s.done)break;
+    await today.locator('[data-action="'+(s.half==='home'?'contact':'normal')+'"]').click();
+    await today.locator('#advance').click();await today.waitForFunction(()=>!document.querySelector('#advance')||!document.querySelector('#advance').disabled);
+  }
+  assert.equal((await snapshot(today)).result,'win');assert.match(await today.locator('#dialog-content').innerText(),/サンライズ、勝利/);await today.locator('#close-dialog').click();await today.locator('#daily').click();assert.match(await today.locator('#dialog-content').innerText(),/保存中の完了記録：1回/);flows++;
+  const old=await page();await old.evaluate(()=>{const s=BenchGame.createDailyGame('2026-10-02');delete s.balanceRevision;delete s.daily.balanceRevision;localStorage.setItem('bench-first-game-v1',JSON.stringify(s));localStorage.setItem('bench-first-history-v1',JSON.stringify([{id:'old-record',result:'loss',home:2,away:3,daily:s.daily}]));});
+  await old.reload();assert(await old.locator('#saved-version-note').isVisible());assert.equal(await old.locator('#game-view').isVisible(),false);await old.locator('#resume-game').click();assert.match(await old.locator('#challenge-label').innerText(),/以前の保存位置/);await old.locator('#daily').click();assert.match(await old.locator('#dialog-content').innerText(),/保存中の完了記録：0回/);await old.locator('#close-dialog').click();
+  await old.goto(url+'/?daily=2026-10-02&rules=02');await old.locator('#entry-start').click();assert.equal((await snapshot(old)).balanceRevision,'05');assert.doesNotMatch(await old.locator('#challenge-label').innerText(),/以前の保存位置/);flows++;
   const invalid=await page();await invalid.goto(url+'/?scenario=unknown');assert.match(await invalid.locator('#dialog-content').innerText(),/見つかりません/);await invalid.locator('#entry-close').click();assert.equal(await invalid.locator('.scenario').count(),7);assert.equal(await invalid.locator('#game-view').isVisible(),false);flows++;
   const mobile=await page();await mobile.setViewportSize({width:390,height:844});assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   if(process.env.BENCH_QA_DIR)await mobile.screenshot({path:join(process.env.BENCH_QA_DIR,'start-mobile.png'),fullPage:true});
