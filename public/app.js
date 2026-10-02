@@ -4,6 +4,7 @@
   const GAME_KEY='bench-first-game-v1',HISTORY_KEY='bench-first-history-v1',PREF_KEY='bench-first-prefs-v2';
   let game,tab='tactics',selected='contact',busy=false,benchMode='pinch',benchTarget=7,storageOK=true,toastTimer,lineupTeam='home';
   let animationSpeed='normal',imageURL=null,imageJob=0;
+  let activeGame=false,hasSavedGame=false;
   const icons={
     contact:'<path d="m6 20 11-13 3 3L8 22zM17 7l2-3 3 3-2 3M5 22l-2-2"/>',
     power:'<path d="m3 21 11-11 4 4L7 23zM14 10l4-7 5 5-5 6M4 6l2-3m1 5 3-1m9 12 2 2"/>',
@@ -18,7 +19,7 @@
   function read(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback;}catch{storageOK=false;return fallback;}}
   function save(){try{localStorage.setItem(GAME_KEY,JSON.stringify(game));}catch{storageOK=false;}$('save-status').textContent=storageOK?'この端末に自動保存':'この環境では保存できません（プレーは可能）';}
   function loadGame(){const s=read(GAME_KEY,null);try{
-    if(s&&[1,G.VERSION].includes(s.version)&&G.scenarios[s.scenario]&&s.inning>=7&&s.inning<=9&&['home','away'].includes(s.half)&&s.outs>=0&&s.outs<3&&s.bases.length===3&&Array.isArray(s.log)&&Array.isArray(s.decisions)&&Number.isFinite(s.rng)&&['home','away'].every(k=>Number.isFinite(s.score[k])&&s.lines[k].length===9&&s.teams[k].lineup.length===9&&s.teams[k].pitchers[s.teams[k].pitcherIndex]&&Array.isArray(s.teams[k].bench))){G.currentBatter(s);G.currentPitcher(s);s.version=G.VERSION;return s;}
+    if(s&&[1,G.VERSION].includes(s.version)&&G.scenarios[s.scenario]&&s.inning>=7&&s.inning<=9&&['home','away'].includes(s.half)&&s.outs>=0&&s.outs<3&&s.bases.length===3&&Array.isArray(s.log)&&Array.isArray(s.decisions)&&Number.isFinite(s.rng)&&['home','away'].every(k=>Number.isFinite(s.score[k])&&s.lines[k].length===9&&s.teams[k].lineup.length===9&&s.teams[k].pitchers[s.teams[k].pitcherIndex]&&Array.isArray(s.teams[k].bench))){G.currentBatter(s);G.currentPitcher(s);s.version=G.VERSION;hasSavedGame=true;return s;}
     }catch{}return G.createGame();}
   function history(){const h=read(HISTORY_KEY,[]);return Array.isArray(h)?h.filter(x=>x&&['win','loss','draw'].includes(x.result)).slice(-100):[];}
   function remember(){const h=history();if(h.some(x=>x.id===game.id))return;h.push({id:game.id,result:game.result,home:game.score.home,away:game.score.away,scenario:game.scenario,date:new Date().toISOString(),daily:game.daily||null});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-100)));}catch{storageOK=false;}}
@@ -51,7 +52,7 @@
   }
   function renderLineup(){
     const t=game.teams[lineupTeam];
-    $('panel').innerHTML='<div class="team-switch" aria-label="打順を表示する球団"><button data-team="home" aria-pressed="'+(lineupTeam==='home')+'">サンライズ</button><button data-team="away" aria-pressed="'+(lineupTeam==='away')+'">ブルーウェーブ</button></div><p class="record-caption">選手名を押すと詳細。'+(game.done?'最終打順を表示しています。':lineupTeam===game.half?'色付きの行が現在の打者です。':'色付きの行が次の攻撃の先頭打者です。')+'</p><div class="lineup-scroll"><table class="lineup-table"><thead><tr><th>番</th><th>選手・特徴</th><th>守</th><th>打</th><th>ミート</th><th>長打</th></tr></thead><tbody>'+t.lineup.map((p,i)=>'<tr class="'+(!game.done&&i===t.order?'current-batter':'')+'"><td>'+(i+1)+'</td><td>'+playerButton(p)+'<small>'+p.trait+'</small></td><td>'+G.positions[i]+(G.positions[i]!=='指'&&!p.pos.includes(G.positions[i])?'※':'')+'</td><td>'+p.hand+'</td><td>'+p.contact+'</td><td>'+p.power+'</td></tr>').join('')+'</tbody></table></div><p class="record-caption">※は守備適性外。交代するとこの打順にも反映されます。</p>';
+    $('panel').innerHTML='<div class="team-switch" aria-label="打順を表示する球団"><button data-team="home" aria-pressed="'+(lineupTeam==='home')+'">サンライズ</button><button data-team="away" aria-pressed="'+(lineupTeam==='away')+'">ブルーウェーブ</button></div><p class="record-caption">選手名を押すと詳細。'+(game.done?'最終打順を表示しています。':lineupTeam===game.half?'色付きの行が現在の打者です。':'色付きの行が次の攻撃の先頭打者です。')+'</p><div class="lineup-scroll"><table class="lineup-table"><thead><tr><th>番</th><th>選手・特徴</th><th>守</th><th>打</th><th>ミート</th><th>長打</th></tr></thead><tbody>'+t.lineup.map((p,i)=>'<tr class="'+(!game.done&&i===t.order?'current-batter':'')+'"><td>'+(i+1)+'</td><td>'+playerButton(p)+'<small>'+p.trait+'</small></td><td>'+G.positionAt(t,i)+(G.positionAt(t,i)!=='指'&&!p.pos.includes(G.positionAt(t,i))?'※':'')+'</td><td>'+p.hand+'</td><td>'+p.contact+'</td><td>'+p.power+'</td></tr>').join('')+'</tbody></table></div><p class="record-caption">※は守備適性外。交代するとこの打順にも反映されます。</p>';
     document.querySelectorAll('[data-team]').forEach(el=>el.onclick=()=>{lineupTeam=el.dataset.team;renderLineup();bindPlayerDetails();});
   }
   function renderTactics(){
@@ -98,9 +99,10 @@
   function scoreTable(){return '<table class="line-score"><caption class="record-caption">イニング別スコア</caption><thead><tr><th>球団</th>'+Array.from({length:9},(_,i)=>'<th>'+ (i+1)+'</th>').join('')+'<th>計</th></tr></thead><tbody>'+['away','home'].map(k=>'<tr><th>'+(k==='home'?'サンライズ':'ウェーブ')+'</th>'+game.lines[k].map(v=>'<td>'+(v===null?'−':v)+'</td>').join('')+'<td class="total">'+game.score[k]+'</td></tr>').join('')+'</tbody></table>';}
   function logHTML(items){return items.map(l=>'<div class="log-row '+l.kind+'"><small>'+l.half+'</small><span>'+esc(l.text)+'</span></div>').join('');}
   function renderRecord(){
-    $('panel').innerHTML='<div class="record-scroll">'+scoreTable()+'<p class="record-caption">操作開始後：サンライズ '+game.stats.home.h+'安打 / '+game.stats.home.bb+'四球 / '+game.stats.home.hr+'本塁打</p><details><summary class="record-caption">現在のサンライズ打順・守備</summary>'+game.teams.home.lineup.map((p,i)=>'<div class="log-row"><small>'+(i+1)+'番</small><span>'+p.name+'（'+G.positions[i]+'）'+(G.positions[i]!=='指'&&!p.pos.includes(G.positions[i])?' · 守備適性外':'')+'</span></div>').join('')+'</details>'+logHTML(game.log.slice().reverse())+'</div>';
+    $('panel').innerHTML='<div class="record-scroll">'+scoreTable()+'<p class="record-caption">操作開始後：サンライズ '+game.stats.home.h+'安打 / '+game.stats.home.bb+'四球 / '+game.stats.home.hr+'本塁打</p><details><summary class="record-caption">現在のサンライズ打順・守備</summary>'+game.teams.home.lineup.map((p,i)=>'<div class="log-row"><small>'+(i+1)+'番</small><span>'+p.name+'（'+G.positionAt(game.teams.home,i)+'）'+(G.positionAt(game.teams.home,i)!=='指'&&!p.pos.includes(G.positionAt(game.teams.home,i))?' · 守備適性外':'')+'</span></div>').join('')+'</details>'+logHTML(game.log.slice().reverse())+'</div>';
   }
-  function render(){renderScore();renderField();$('command-title').innerHTML=game.done?'最後の一球まで、<br>あなたの采配。':game.half==='home'?'あなたの采配で、<br>流れを変える。':'この一球を、<br>誰に託す？';$('phase').textContent=game.done?'試合終了':(game.half==='home'?'攻撃中':'守備中')+' / '+game.outs+'死'+(baseText()==='走者なし'?'走者なし':baseText());$('phase').className='phase '+(game.half==='away'?'defend':'');
+  function render(){if(!activeGame)return;G.prepareTurn(game);renderScore();renderField();$('command-title').innerHTML=game.done?'最後の一球まで、<br>あなたの采配。':game.half==='home'?'あなたの采配で、<br>流れを変える。':'この一球を、<br>誰に託す？';$('phase').textContent=game.done?'試合終了':(game.half==='home'?'攻撃中':'守備中')+' / '+game.outs+'死'+(baseText()==='走者なし'?'走者なし':baseText());$('phase').className='phase '+(game.half==='away'?'defend':'');
+    const changes=game.done?[]:game.turnChanges||[];$('cpu-changes').hidden=!changes.length;$('cpu-changes').innerHTML=changes.length?'<strong>相手の交代を確認してから、采配を選びましょう。</strong>'+changes.map(l=>'<p>'+esc(l.text)+'</p>').join(''):'';
     document.querySelectorAll('[data-tab]').forEach(el=>{el.setAttribute('aria-selected',el.dataset.tab===tab);el.tabIndex=el.dataset.tab===tab?0:-1;});$('panel').setAttribute('aria-labelledby','tab-'+tab);
     if(tab==='tactics')renderTactics();else if(tab==='bench')renderBench();else if(tab==='lineup')renderLineup();else renderRecord();bindPlayerDetails();renderChallengeLabel();
     $('recent').innerHTML=logHTML(game.log.slice(-3).reverse());save();
@@ -131,17 +133,24 @@
     $('challenge-label').textContent=game.daily?'共通のお題 '+game.daily.date+' · '+G.scenarios[game.scenario].name:'自由に挑戦 · '+G.scenarios[game.scenario].name;
     $('animation-speed').value=animationSpeed;
   }
+  function difficultyHTML(sc){return '<span class="difficulty" aria-label="難易度5段階中'+sc.difficulty+'">難易度 '+'★'.repeat(sc.difficulty)+'☆'.repeat(5-sc.difficulty)+'</span>';}
+  function activateGame(){activeGame=true;hasSavedGame=true;$('start-screen').hidden=true;$('game-view').hidden=false;render();}
+  function showScenario(scenario){
+    const sc=G.scenarios[scenario];
+    openDialog(dialogHead('この場面から始める')+'<div class="daily-card"><h3>'+sc.name+'</h3>'+difficultyHTML(sc)+'<p>'+sc.text+'</p><p class="record-caption">'+sc.difficultyReason+'</p></div><p class="dialog-text">ここに表示しているのは開始条件です。試合の展開は、あなたの采配で決まります。'+(hasSavedGame&&!game.done?'開始すると進行中の試合を置き換えます。':'')+'</p><div class="dialog-actions"><button id="scene-back" class="small-button">場面を選び直す</button><button id="scene-start" class="primary">試合を開始する</button></div>');
+    $('scene-back').onclick=showSetup;$('scene-start').onclick=()=>newGame(scenario);
+  }
   function showDaily(){
     if(busy)return;const d=G.dailySpec(),sc=G.scenarios[d.scenario],past=history().filter(x=>x.daily?.code===d.code),first=past[0];
-    openDialog(dialogHead('今日の共通のお題')+'<p class="challenge-date">'+d.date+' · お題 '+d.code+'</p><div class="daily-card"><h3>'+sc.name+'</h3><p>'+sc.text+'</p><strong>サンライズ '+sc.home+' − '+sc.away+' ブルーウェーブ</strong></div><div class="dialog-text"><p>日本時間の毎日0時にお題が切り替わります。同じ版・同じお題では、開始条件と抽選の並びが共通です。<strong>同じ采配なら同じ結果</strong>になり、選び方を変えて再挑戦できます。</p><p>保存中の完了記録：'+past.length+'回'+(first?' / 記録内の初回：'+({win:'勝利',loss:'敗戦',draw:'引き分け'}[first.result])+'（'+first.home+' − '+first.away+'）':' / 完了記録なし')+'（直近100試合内）</p><p>結果をコピーして比べられます。全員の戦績を集計するオンラインランキングはありません。</p>'+(!game.done?'<p class="warning">開始すると進行中の試合は終了します。</p>':'')+'</div><button class="primary" id="start-daily">同じ条件で挑戦する</button>');
+    openDialog(dialogHead('今日の共通のお題')+'<p class="challenge-date">'+d.date+' · お題 '+d.code+'</p><div class="daily-card"><h3>'+sc.name+'</h3>'+difficultyHTML(sc)+'<p>'+sc.text+'</p><strong>サンライズ '+sc.home+' − '+sc.away+' ブルーウェーブ</strong></div><div class="dialog-text"><p>日本時間の毎日0時にお題が切り替わります。同じ版・同じお題では、開始条件と抽選の並びが共通です。<strong>同じ采配なら同じ結果</strong>になり、選び方を変えて再挑戦できます。</p><p>保存中の完了記録：'+past.length+'回'+(first?' / 記録内の初回：'+({win:'勝利',loss:'敗戦',draw:'引き分け'}[first.result])+'（'+first.home+' − '+first.away+'）':' / 完了記録なし')+'（直近100試合内）</p><p>結果をコピーして比べられます。全員の戦績を集計するオンラインランキングはありません。</p>'+(hasSavedGame&&!game.done?'<p class="warning">開始すると進行中の試合は終了します。</p>':'')+'</div><button class="primary" id="start-daily">同じ条件で挑戦する</button>');
     $('start-daily').onclick=()=>newGame(d.scenario,d.date);
   }
-  function showSetup(){if(busy)return;openDialog(dialogHead('どの試合を指揮する？')+'<p class="dialog-text">あなたは後攻のサンライズ。選んだ場面から9回終了まで指揮します。'+(!game.done?'開始すると進行中の試合は終了します。':'')+'</p><button id="setup-daily" class="daily-button setup-daily">今日の共通のお題で遊ぶ</button><div class="scenario-list">'+Object.entries(G.scenarios).map(([k,s])=>'<button class="scenario" data-scenario="'+k+'"><span><strong>'+s.name+'</strong><small>'+s.text+'</small></span><span class="num">'+s.home+' − '+s.away+'</span></button>').join('')+'</div><p class="record-caption">左があなたのチーム。自由に挑戦するモードでは結果は毎回変わります。</p>');document.querySelectorAll('[data-scenario]').forEach(el=>el.onclick=()=>newGame(el.dataset.scenario));$('setup-daily').onclick=showDaily;}
+  function showSetup(){if(busy)return;openDialog(dialogHead('どの試合を指揮する？')+'<p class="dialog-text">あなたは後攻のサンライズ。選んだ場面から9回終了まで指揮します。'+(hasSavedGame&&!game.done?'開始すると進行中の試合は終了します。':'')+'</p><button id="setup-daily" class="daily-button setup-daily">今日の共通のお題で遊ぶ</button><div class="scenario-list">'+Object.entries(G.scenarios).map(([k,s])=>'<button class="scenario" data-scenario="'+k+'"><span><strong>'+s.name+'</strong><small>'+s.text+'</small>'+difficultyHTML(s)+'</span><span class="num">'+s.home+' − '+s.away+'</span></button>').join('')+'</div><p class="record-caption">左があなたのチーム。自由に挑戦するモードでは結果は毎回変わります。</p>');document.querySelectorAll('[data-scenario]').forEach(el=>el.onclick=()=>showScenario(el.dataset.scenario));$('setup-daily').onclick=showDaily;}
   function newGame(scenario,dailyDate=null){
     clearEntry();
     const attempt=String(Date.now())+'-'+Math.floor(Math.random()*100000);
     game=dailyDate?G.createDailyGame(dailyDate,attempt):G.createGame(scenario,Date.now()+Math.floor(Math.random()*100000));
-    selected=game.half==='home'?'contact':'normal';tab='tactics';lineupTeam=game.half;benchMode=game.half==='home'?'pinch':'pitcher';benchTarget=game.teams.home.order;$('dialog').close();render();window.scrollTo({top:0,behavior:'instant'});
+    selected=game.half==='home'?'contact':'normal';tab='tactics';lineupTeam=game.half;benchMode=game.half==='home'?'pinch':'pitcher';benchTarget=game.teams.home.order;$('dialog').close();activateGame();window.scrollTo({top:0,behavior:'instant'});
   }
   function showHelp(){openDialog(dialogHead('監督の仕事は、選ぶこと。')+'<div class="dialog-text"><p><strong>あなたは後攻のサンライズ。選んだ場面から9回終了までを戦います。</strong>打撃・投球のタイミング操作はありません。</p><ol><li>「采配」で作戦を選び、<strong>この作戦で進める</strong>を押すと1打席が進みます。</li><li>3アウトで攻守交代。守備では投球方針を選びます。</li><li>「ベンチ」で代打・代走・継投・守備交代。交代は確認後に確定します。</li><li>「打順」で両チームの打順を確認。選手名を押すと全能力が開きます。</li><li>「記録」でスコアと采配を振り返れます。</li></ol><p><strong>能力は100段階。</strong>ミート・長打・走力・守備・選球眼・バント、投手の球威・制球・疲労・左右相性が結果に影響します。良い選択でも必ず成功するわけではありません。</p><p><strong>守備適性に注意。</strong>例えば控え捕手を代打に使うと、打力が上がっても捕手の守備力が下がります。投手の疲労は球数とスタミナで増加します。</p><p>試作版は全試合DH制。送りバントは2死・三塁走者ありでは不可、盗塁は二盗・三盗のみです。走塁・併殺は簡略化しています。実際の試合を予測するものではありません。</p><p>「今日の共通のお題」は日本時間の日付で切り替わります。同じ版・同じお題・同じ采配なら結果を再現できます。演出は標準／速い／なしから選べます。端末で動きを減らす設定をしている場合も演出を省略します。</p><p>「リンク」から今日・指定日・シナリオのリンクをコピーできます。試合終了後は結果のコピー・対応端末の共有・PNG画像の保存ができます。</p><p>進行と直近100試合の戦績をこの端末に保存します。ブラウザのデータ削除で消えます。公開URLとローカルファイルの保存は別です。</p></div><button class="primary" id="help-done">采配を始めよう</button>');$('help-done').onclick=()=>$('dialog').close();}
   function shareText(){return S.text(S.resultData(game,G));}
@@ -179,10 +188,10 @@
   function showEntry(){
     const entry=S.parse(location.search,G);if(!entry)return;
     clearEntry();
-    if(entry.error){openDialog(dialogHead('リンクを確認してください')+'<p class="dialog-text">'+esc(entry.error)+'</p><button id="entry-close" class="primary">今の試合に戻る</button>');$('entry-close').onclick=()=>$('dialog').close();return;}
+    if(entry.error){openDialog(dialogHead('リンクを確認してください')+'<p class="dialog-text">'+esc(entry.error)+'</p><button id="entry-close" class="primary">場面を選ぶ</button>');$('entry-close').onclick=showSetup;return;}
     const d=entry.kind==='today'?G.dailySpec():entry.kind==='daily'?entry:null;
     const scenario=d?d.scenario:entry.scenario,sc=G.scenarios[scenario];
-    openDialog(dialogHead(d?'共通のお題に挑戦':'この場面に挑戦')+(d?'<p class="challenge-date">'+d.date+' · お題 '+d.code+'</p>':'')+'<div class="daily-card"><h3>'+sc.name+'</h3><p>'+sc.text+'</p><strong>サンライズ '+sc.home+' − '+sc.away+' ブルーウェーブ</strong></div><p class="dialog-text">'+(d?'同じお題・同じ采配なら結果を再現できます。':'この場面から始めます。抽選は毎回変わります。')+'</p>'+(!game.done?'<p class="dialog-text warning">開始すると進行中の試合を置き換えます。閉じると今の試合に戻れます。</p>':'')+'<div class="dialog-actions"><button id="entry-close" class="small-button">戻る</button><button id="entry-start" class="primary">挑戦する</button></div>');
+    openDialog(dialogHead(d?'共通のお題に挑戦':'この場面に挑戦')+(d?'<p class="challenge-date">'+d.date+' · お題 '+d.code+'</p>':'')+'<div class="daily-card"><h3>'+sc.name+'</h3>'+difficultyHTML(sc)+'<p>'+sc.text+'</p><strong>サンライズ '+sc.home+' − '+sc.away+' ブルーウェーブ</strong></div><p class="dialog-text">'+(d?'同じお題・同じ采配なら結果を再現できます。':'この場面から始めます。抽選は毎回変わります。')+'</p>'+(hasSavedGame&&!game.done?'<p class="dialog-text warning">開始すると進行中の試合を置き換えます。保存した試合は開始画面から再開できます。</p>':'')+'<div class="dialog-actions"><button id="entry-close" class="small-button">戻る</button><button id="entry-start" class="primary">挑戦する</button></div>');
     $('entry-close').onclick=()=>$('dialog').close();$('entry-start').onclick=()=>{const now=entry.kind==='today'?G.dailySpec():d;newGame(now?now.scenario:scenario,now?now.date:null);};
   }
   function showResult(){
@@ -196,5 +205,9 @@
   const prefs=read(PREF_KEY,{});animationSpeed=['normal','fast','none'].includes(prefs?.speed)?prefs.speed:'normal';
   $('animation-speed').onchange=e=>{animationSpeed=e.target.value;try{localStorage.setItem(PREF_KEY,JSON.stringify({speed:animationSpeed}));}catch{storageOK=false;}save();};
   document.querySelectorAll('[data-tab]').forEach(el=>{el.onclick=()=>switchTab(el.dataset.tab);el.onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=['tactics','bench','lineup','record'];let i=tabs.indexOf(tab);i=e.key==='Home'?0:e.key==='End'?3:(i+(e.key==='ArrowRight'?1:3))%4;switchTab(tabs[i]);$('tab-'+tabs[i]).focus();};});
-  game=loadGame();lineupTeam=game.half;if(game.done)remember();render();showEntry();
+  game=loadGame();lineupTeam=game.half;
+  $('choose-scenario').onclick=showSetup;$('start-today').onclick=showDaily;
+  $('resume-game').hidden=!hasSavedGame;$('resume-game').textContent=game.done?'保存した試合の記録を見る':'続きから遊ぶ';
+  $('resume-game').onclick=()=>{selected=game.half==='home'?'contact':'normal';activateGame();if(game.done){remember();switchTab('record');}};
+  showEntry();
 })();
