@@ -7,6 +7,16 @@
   'use strict';
   const VERSION = 2;
   const BALANCE_REVISION = '05';
+  const opponentTypes = {
+    balanced:{name:'バランス型',strength:'打線・守備・投手に極端な偏りがない。',weakness:'突出した強みはなく、選手ごとの特徴で勝負。',tip:'打者の能力と投手の疲労を見て判断しよう。'},
+    power:{name:'長打型',strength:'主軸だけでなく打線全体に一発がある。',weakness:'守備・走力・投手の能力は控えめ。',tip:'一発に注意。相手の守備と投手の弱みも見よう。'},
+    defense:{name:'守備・継投型',strength:'堅い守備と、球威・制球の高い救援陣。',weakness:'長打とミートは控えめ。',tip:'救援の顔ぶれを確認し、得点の機会を逃さないように。'}
+  };
+  function opponentType(value='balanced') {
+    const key=typeof value==='string'?value:value?.opponent||'balanced';
+    return Object.prototype.hasOwnProperty.call(opponentTypes,key)?key:'balanced';
+  }
+  function opponentInfo(value) {return opponentTypes[opponentType(value)];}
   const dailySeeds = new Map();
   const positions = ['中', '二', '右', '一', '指', '三', '左', '捕', '遊'];
   const scenarios = {
@@ -35,7 +45,7 @@
   function pitcher(id, name, hand, stuff, control, stamina, pitches, trait) {
     return { id, name, hand, stuff, control, stamina, pitches, trait };
   }
-  function makeTeam(home) {
+  function makeTeam(home,opponent='balanced') {
     const p = home ? 'h' : 'a';
     const names = home ? ['朝倉 蓮','水野 悠','桐谷 隼人','大河 陸','橘 翔','片桐 誠','相沢 直樹','守屋 司','早瀬 湊','高峰 豪','白石 和真','風間 颯'] : ['青野 航','瀬戸 陽','浜田 亮','黒瀬 剛','成瀬 遼','川島 岳','沖田 純','深町 慎','小波 翼','岩城 仁','三浦 律','波多野 怜'];
     const stats = [
@@ -53,7 +63,7 @@
       ['右',['中','右','左'],57,30,98,85,55,73,'代走・守備の切り札']
     ];
     const all = stats.map((s,i) => batter(p+i,names[i],...s));
-    return {
+    const team = {
       name: home ? 'サンライズ' : 'ブルーウェーブ',
       lineup: all.slice(0,9), fieldPositions:positions.slice(), bench: all.slice(9), removed: [], order: home ? 7 : 2,
       pitchers: [
@@ -63,6 +73,17 @@
         pitcher(p+'p3',home?'城戸 悠斗':'城山 徹','右',84,85,23,0,'守護神・短い回向き')
       ], pitcherIndex: 0, usedPitchers: [0]
     };
+    if(!home&&opponent!=='balanced'){
+      for(const player of all){
+        const changes=opponent==='power'?{power:10,defense:-10,speed:-6}:{power:-9,contact:-3,defense:9};
+        for(const [key,delta] of Object.entries(changes))player[key]=clamp(player[key]+delta,0,100);
+      }
+      for(const [index,p] of team.pitchers.entries()){
+        if(opponent==='power'){p.stuff=clamp(p.stuff-5,0,100);p.control=clamp(p.control-5,0,100);}
+        else if(index>0){p.stuff=clamp(p.stuff+5,0,100);p.control=clamp(p.control+7,0,100);}
+      }
+    }
+    return team;
   }
   function random(s) { let x=s.rng>>>0; x^=x<<13; x^=x>>>17; x^=x<<5; s.rng=x>>>0; return s.rng/4294967296; }
   function clamp(x,min,max) { return Math.max(min,Math.min(max,x)); }
@@ -72,12 +93,14 @@
   function currentBatter(s) { const t=batting(s);return t.lineup[t.order]; }
   function currentPitcher(s) { const t=fielding(s);return t.pitchers[t.pitcherIndex]; }
   function addLog(s,text,kind='play') { const l={half:halfName(s),text,kind};s.log.push(l);return l; }
-  function createGame(scenario='chase',seed=Date.now()) {
+  function createGame(scenario='chase',seed=Date.now(),options={}) {
+    const opponent=options.opponent===undefined?'balanced':options.opponent;
+    if(typeof opponent!=='string'||!Object.prototype.hasOwnProperty.call(opponentTypes,opponent))throw new Error('Invalid opponent');
     if (!scenarios[scenario]) scenario='chase';
     const sc=scenarios[scenario];
-    const s={ version:VERSION,balanceRevision:BALANCE_REVISION,id:String(seed)+'-'+scenario,rng:(seed>>>0)||12345,scenario,inning:sc.inning||7,half:sc.half||'home',outs:sc.outs===undefined?1:sc.outs,
+    const s={ version:VERSION,balanceRevision:BALANCE_REVISION,opponent,id:String(seed)+'-'+scenario+(opponent==='balanced'?'':'-'+opponent),rng:(seed>>>0)||12345,scenario,inning:sc.inning||7,half:sc.half||'home',outs:sc.outs===undefined?1:sc.outs,
       score:{home:sc.home,away:sc.away}, lines:{home:[0,1,0,0,sc.home-1,0,0,null,null],away:[1,0,0,1,0,sc.away-2,0,null,null]},
-      teams:{home:makeTeam(true),away:makeTeam(false)},bases:[null,null,null],log:[],decisions:[],done:false,result:null,plays:0,
+      teams:{home:makeTeam(true),away:makeTeam(false,opponent)},bases:[null,null,null],log:[],decisions:[],done:false,result:null,plays:0,
       stats:{home:{h:0,bb:0,k:0,hr:0},away:{h:0,bb:0,k:0,hr:0}}, defense:'normal' };
     for(const side of ['home','away'])for(let i=6;i<9;i++)s.lines[side][i]=(i<s.inning-1||(i===s.inning-1&&(side==='away'||s.half==='home')))?0:null;
     const t=batting(s);if(sc.order!==undefined)t.order=sc.order;
@@ -397,5 +420,5 @@
     endPlay(s,true);return {ok:true,events:s.log.slice(start),runs:s.lastPlay.runs,play:s.lastPlay};
   }
   function setDefense(s,value) {if(s.done||s.half!=='away'||!['normal','in'].includes(value))return false;s.defense=value;recordDecision(s,'守備位置：'+(value==='in'?'前進守備。内野ゴロでの本塁生還を防ぐ代わりに、安打が増えます。':'定位置に戻します。'));return true;}
-  return { VERSION,BALANCE_REVISION,positions,positionAt,scenarios,createGame,createDailyGame,dailySpec,japanDate,buntChance,effectiveDefense,prepareTurn,step,replacePlayer,changePitcher,setDefense,batting,fielding,currentBatter,currentPitcher,fieldDefense,fatigue,stealInfo,canBunt,halfName,probabilities,matchupProbabilities };
+  return { VERSION,BALANCE_REVISION,opponentTypes,opponentType,opponentInfo,positions,positionAt,scenarios,createGame,createDailyGame,dailySpec,japanDate,buntChance,effectiveDefense,prepareTurn,step,replacePlayer,changePitcher,setDefense,batting,fielding,currentBatter,currentPitcher,fieldDefense,fatigue,stealInfo,canBunt,halfName,probabilities,matchupProbabilities };
 });
