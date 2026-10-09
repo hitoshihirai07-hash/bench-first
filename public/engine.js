@@ -101,6 +101,7 @@
     const s={ version:VERSION,balanceRevision:BALANCE_REVISION,opponent,id:String(seed)+'-'+scenario+(opponent==='balanced'?'':'-'+opponent),rng:(seed>>>0)||12345,scenario,inning:sc.inning||7,half:sc.half||'home',outs:sc.outs===undefined?1:sc.outs,
       score:{home:sc.home,away:sc.away}, lines:{home:[0,1,0,0,sc.home-1,0,0,null,null],away:[1,0,0,1,0,sc.away-2,0,null,null]},
       teams:{home:makeTeam(true),away:makeTeam(false,opponent)},bases:[null,null,null],log:[],decisions:[],done:false,result:null,plays:0,
+      review:{version:1,legacy:false,items:[],pending:null},
       stats:{home:{h:0,bb:0,k:0,hr:0},away:{h:0,bb:0,k:0,hr:0}}, defense:'normal' };
     for(const side of ['home','away'])for(let i=6;i<9;i++)s.lines[side][i]=(i<s.inning-1||(i===s.inning-1&&(side==='away'||s.half==='home')))?0:null;
     const t=batting(s);if(sc.order!==undefined)t.order=sc.order;
@@ -263,6 +264,29 @@
   }
   function canBunt(s) {return s.outs<2&&!s.bases[2]&&!!(s.bases[0]||s.bases[1]);}
   function recordDecision(s,text) {s.decisions.push({half:halfName(s),text});addLog(s,text,'decision');}
+  function reviewSituation(s) {
+    const b=currentBatter(s),p=currentPitcher(s);
+    return {inning:s.inning,half:s.half,outs:s.outs,score:{...s.score},
+      bases:s.bases.map(r=>r?{id:r.id,name:r.name}:null),
+      batter:{id:b.id,name:b.name},pitcher:{id:p.id,name:p.name,pitches:p.pitches},defense:s.defense};
+  }
+  function queueReview(s,text) {
+    // Old saves have no detailed history: record only operations made from now on.
+    if(!s.review)s.review={version:1,legacy:true,items:[],pending:null};
+    if(!s.review.pending||s.review.pending.play!==s.plays){
+      s.review.pending={play:s.plays,before:reviewSituation(s),choices:[],cpuChanges:(s.turnChanges||[]).map(l=>l.text)};
+    }
+    s.review.pending.choices.push(text);
+  }
+  function completeReview(s) {
+    const card=s.review?.pending,p=s.lastPlay;
+    if(!card||!p)return;
+    // lastPlay keeps the state before endPlay clears runners or switches innings.
+    card.result={outcome:p.outcome,outs:p.outsAfter,bases:p.afterBases.map(r=>r?{...r}:null),
+      score:{...s.score},runs:p.runs,batter:{...p.batter},pitcher:{...p.pitcher},finished:s.done,
+      changedHalf:s.inning!==card.before.inning||s.half!==card.before.half};
+    s.review.items.push(card);s.review.pending=null;
+  }
   function replacePlayer(s,index,id,mode='pinch') {
     if(s.done)return false;
     const t=s.teams.home;
@@ -272,6 +296,7 @@
     const bi=t.bench.findIndex(p=>p.id===id);if(bi<0)return false;
     const old=t.lineup[index],incoming=t.bench[bi];
     if(mode==='runner'&&(s.half!=='home'||!s.bases.some(p=>p&&p.id===old.id)))return false;
+    if(mode==='pinch')queueReview(s,'代打：'+old.name+' → '+incoming.name);
     t.lineup[index]=incoming;t.bench.splice(bi,1);t.removed.push(old);
     s.bases=s.bases.map(p=>p&&p.id===old.id?incoming:p);
     const label=mode==='runner'?'代走':mode==='defense'?'守備交代':'代打';
@@ -282,6 +307,7 @@
     if(s.done||!['home','away'].includes(team))return false;
     const t=s.teams[team];
     if(t.usedPitchers.includes(index)||!t.pitchers[index])return false;
+    if(team==='home')queueReview(s,'継投：'+t.pitchers[t.pitcherIndex].name+' → '+t.pitchers[index].name);
     t.pitcherIndex=index;t.usedPitchers.push(index);
     recordDecision(s,(team==='home'?'継投':'相手の継投')+'：'+t.pitchers[index].name+'。'+t.pitchers[index].trait+'。');return true;
   }
@@ -374,12 +400,13 @@
     const probs=matchupProbabilities(s,action);
     s.lastPlay={half:s.half,inning:s.inning,batter:{id:b.id,name:b.name},pitcher:{id:p.id,name:p.name},beforeBases:s.bases.map(p=>p?{id:p.id,name:p.name}:null),outsBefore:s.outs,scoreBefore:s.score[s.half],scored:[],outIds:[],outcome:'',direction:(s.plays%3)-1};
     const labels={contact:offense?'ミート重視':'打たせて取る',power:'長打狙い',bunt:'送りバント',steal:'盗塁',normal:'バランス',strikeout:'三振を狙う',low:'低めで勝負'};
+    queueReview(s,labels[action]+'：'+(offense?b.name:p.name));
     s.decisions.push({half:halfName(s),text:labels[action]+'：'+(offense?b.name:p.name)});
     if(action==='steal'){
       const info=stealInfo(s);p.pitches++;
       if(random(s)<info.chance){s.lastPlay.outcome='steal';s.bases[info.base+1]=info.runner;s.bases[info.base]=null;addLog(s,info.runner.name+'、'+(info.base===0?'二':'三')+'盗成功！','steal');}
       else{s.lastPlay.outcome='caught';s.lastPlay.outIds.push(info.runner.id);s.bases[info.base]=null;s.outs++;addLog(s,info.runner.name+'、盗塁失敗。アウト。','out');}
-      endPlay(s,false);return {ok:true,events:s.log.slice(start),play:s.lastPlay};
+      endPlay(s,false);completeReview(s);return {ok:true,events:s.log.slice(start),play:s.lastPlay};
     }
     p.pitches+=3+Math.floor(random(s)*4)+(defend==='strikeout'?1:0);
     if(attack==='bunt'){
@@ -417,7 +444,7 @@
       }
       if(s.score[s.half]>before)addLog(s,(s.score[s.half]-before)+'点が入りました。サンライズ '+s.score.home+' − '+s.score.away+' ブルーウェーブ。','score');
     }
-    endPlay(s,true);return {ok:true,events:s.log.slice(start),runs:s.lastPlay.runs,play:s.lastPlay};
+    endPlay(s,true);completeReview(s);return {ok:true,events:s.log.slice(start),runs:s.lastPlay.runs,play:s.lastPlay};
   }
   function setDefense(s,value) {if(s.done||s.half!=='away'||!['normal','in'].includes(value))return false;s.defense=value;recordDecision(s,'守備位置：'+(value==='in'?'前進守備。内野ゴロでの本塁生還を防ぐ代わりに、安打が増えます。':'定位置に戻します。'));return true;}
   return { VERSION,BALANCE_REVISION,opponentTypes,opponentType,opponentInfo,positions,positionAt,scenarios,createGame,createDailyGame,dailySpec,japanDate,buntChance,effectiveDefense,prepareTurn,step,replacePlayer,changePitcher,setDefense,batting,fielding,currentBatter,currentPitcher,fieldDefense,fatigue,stealInfo,canBunt,halfName,probabilities,matchupProbabilities };
