@@ -22,8 +22,8 @@
   <meta name="twitter:image" content="https://bench-first.pages.dev/assets/ogp-v03.png">
   <meta name="twitter:image:alt" content="ベンチからの一手。代打か、続投か。あなたなら、どう采配する？">
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=07">
-  <script src="./engine.js?v=07" defer></script><script src="./motion.js?v=05" defer></script><script src="./sharing.js?v=06" defer></script><script src="./app.js?v=07" defer></script>
+  <link rel="stylesheet" href="./styles.css?v=08">
+  <script src="./engine.js?v=08" defer></script><script src="./motion.js?v=05" defer></script><script src="./sharing.js?v=06" defer></script><script src="./app.js?v=08" defer></script>
 </head>
 <body>
   <header class="header"><div class="brand"><img src="./assets/icon.svg" alt="" width="36" height="36"><h1>ベンチからの一手</h1><span class="tagline">采配で、もうひとつのドラマを。</span></div><div class="header-actions"><button id="help" class="small-button">遊び方</button><button id="restart" class="small-button orange-outline">はじめから</button></div></header>
@@ -42,17 +42,19 @@
         <div id="matchup" class="matchup"></div>
         <div id="upcoming" class="upcoming" aria-label="次の3打者"></div>
       </section>
-      <section class="command-panel" aria-label="監督の采配">
+      <div id="command-home"><section class="command-panel" aria-label="監督の采配">
         <div class="command-heading"><h2 id="command-title">あなたの采配で、<br>流れを変える。</h2><span id="phase" class="phase"></span></div>
         <div class="tabs" role="tablist" aria-label="表示切り替え"><button role="tab" id="tab-tactics" data-tab="tactics" aria-controls="panel" aria-selected="true">采配</button><button role="tab" id="tab-bench" data-tab="bench" aria-controls="panel" aria-selected="false">ベンチ</button><button role="tab" id="tab-lineup" data-tab="lineup" aria-controls="panel" aria-selected="false">打順</button><button role="tab" id="tab-record" data-tab="record" aria-controls="panel" aria-selected="false">記録</button></div>
         <div id="panel" role="tabpanel" aria-labelledby="tab-tactics"></div>
-      </section>
+      </section></div>
     </div>
     <section class="recent"><h2>最近のプレー</h2><div id="recent" aria-live="polite" aria-atomic="true"></div></section>
+    <nav id="mobile-controls" aria-label="試合の操作"><span id="mobile-status"></span><button id="mobile-tactics" class="primary" data-mobile-tab="tactics">采配</button><button id="mobile-bench" class="small-button orange-outline" data-mobile-tab="bench">交代</button><button id="mobile-record" class="small-button" data-mobile-tab="record">記録</button></nav>
     </div>
-    <footer><a href="https://pro-baseball-watch-guide.com/" target="_blank" rel="noopener">プロ野球観戦メモ</a><span>架空の球団・選手によるゲーム · 試作版 0.7</span><span id="save-status"></span></footer>
+    <footer><a href="https://pro-baseball-watch-guide.com/" target="_blank" rel="noopener">プロ野球観戦メモ</a><span>架空の球団・選手によるゲーム · 試作版 0.8</span><span id="save-status"></span></footer>
   </main>
   <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+  <dialog id="command-dialog" aria-labelledby="command-dialog-title"><div id="command-dialog-content"><div class="command-dialog-bar"><div class="command-dialog-heading"><h2 id="command-dialog-title">采配を選ぶ</h2><button id="close-command" class="small-button" aria-label="采配・交代の画面を閉じる">閉じる</button></div><p id="command-context"></p></div></div></dialog>
   <div id="toast" role="status"></div>
   <noscript>このゲームを遊ぶには、ブラウザのJavaScriptを有効にしてください。</noscript>
 </body>

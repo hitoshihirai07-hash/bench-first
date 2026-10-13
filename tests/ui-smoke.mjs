@@ -18,8 +18,8 @@ const snapshot=p=>p.evaluate(()=>JSON.parse(localStorage.getItem('bench-first-ga
 async function start(p,key){await p.locator('#choose-scenario').click();await p.locator('[data-scenario="'+key+'"]').click();assert.equal(await p.locator('#game-view').isVisible(),false);assert.match(await p.locator('.daily-card').innerText(),/難易度/);await p.locator('#scene-start').click();await p.locator('#animation-speed').selectOption('none');}
 try{
   const p=await page();assert.match(await p.title(),/ベンチからの一手/);assert(await p.locator('#start-screen').isVisible());assert.equal(await p.locator('#game-view').isVisible(),false);assert.equal(await p.locator('#scoreboard').textContent(),'');assert.equal(await snapshot(p),null);
-  await p.locator('#choose-scenario').click();assert.equal(await p.locator('.scenario .difficulty').count(),7);await p.locator('[data-scenario="last"]').click();await p.locator('#close-dialog').click();assert.equal(await p.locator('#game-view').isVisible(),false);flows++;
-  for(const key of ['chase','tie','lead','advance','ace','last','miracle']){
+  await p.locator('#choose-scenario').click();assert.equal(await p.locator('.scenario .difficulty').count(),8);await p.locator('[data-scenario="last"]').click();await p.locator('#close-dialog').click();assert.equal(await p.locator('#game-view').isVisible(),false);flows++;
+  for(const key of ['chase','tie','lead','advance','ace','last','miracle','protect']){
     const p=await page();await start(p,key);const initial=await snapshot(p);assert.equal(initial.scenario,key);assert(await p.locator('#matchup').isVisible());
     if(key==='chase'){
       await p.locator('#tab-bench').click();await p.locator('[data-sub="h10"]').click();await p.locator('#confirm').click();assert.match(await p.locator('#matchup').innerText(),/白石/);await p.locator('#tab-tactics').click();
@@ -34,7 +34,7 @@ try{
       await p.locator('#advance').click();await p.waitForFunction(()=>!document.querySelector('#advance')||!document.querySelector('#advance').disabled);
       const after=await snapshot(p);assert.equal(after.lastPlay.batter.id,ids[0]);assert.equal(after.lastPlay.pitcher.id,ids[1]);
     }
-    const done=await snapshot(p);assert(done.done,key+' did not finish');assert.match(await p.locator('#dialog-content').innerText(),/試合の分岐点/);
+    const done=await snapshot(p);assert(done.done,key+' did not finish');assert.match(await p.locator('#dialog-content').innerText(),/あなたの采配を振り返る/);
     if(key==='chase'){
       await p.locator('#result-png').click();await p.locator('#result-image').waitFor();assert.equal(await p.locator('#result-image').evaluate(el=>el.naturalWidth),1200);await p.locator('#image-back').click();
     }
@@ -58,10 +58,22 @@ try{
   const old=await page();await old.evaluate(()=>{const s=BenchGame.createDailyGame('2026-10-02');delete s.balanceRevision;delete s.daily.balanceRevision;localStorage.setItem('bench-first-game-v1',JSON.stringify(s));localStorage.setItem('bench-first-history-v1',JSON.stringify([{id:'old-record',result:'loss',home:2,away:3,daily:s.daily}]));});
   await old.reload();assert(await old.locator('#saved-version-note').isVisible());assert.equal(await old.locator('#game-view').isVisible(),false);await old.locator('#resume-game').click();assert.match(await old.locator('#challenge-label').innerText(),/以前の保存位置/);await old.locator('#daily').click();assert.match(await old.locator('#dialog-content').innerText(),/保存中の完了記録：0回/);await old.locator('#close-dialog').click();
   await old.goto(url+'/?daily=2026-10-02&rules=02');await old.locator('#entry-start').click();assert.equal((await snapshot(old)).balanceRevision,'05');assert.doesNotMatch(await old.locator('#challenge-label').innerText(),/以前の保存位置/);flows++;
-  const invalid=await page();await invalid.goto(url+'/?scenario=unknown');assert.match(await invalid.locator('#dialog-content').innerText(),/見つかりません/);await invalid.locator('#entry-close').click();assert.equal(await invalid.locator('.scenario').count(),7);assert.equal(await invalid.locator('#game-view').isVisible(),false);flows++;
+  const invalid=await page();await invalid.goto(url+'/?scenario=unknown');assert.match(await invalid.locator('#dialog-content').innerText(),/見つかりません/);await invalid.locator('#entry-close').click();assert.equal(await invalid.locator('.scenario').count(),8);assert.equal(await invalid.locator('#game-view').isVisible(),false);flows++;
   const mobile=await page();await mobile.setViewportSize({width:390,height:844});assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   if(process.env.BENCH_QA_DIR)await mobile.screenshot({path:join(process.env.BENCH_QA_DIR,'start-mobile.png'),fullPage:true});
   await start(mobile,'ace');assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await mobile.setViewportSize({width:390,height:667});
+  const mobileBefore=await snapshot(mobile),dock=await mobile.locator('#mobile-tactics').boundingBox();assert(dock.y+dock.height<=667);
+  await mobile.locator('#mobile-tactics').click();assert(await mobile.locator('#command-dialog').isVisible());
+  await mobile.locator('[data-defense="in"]').click();await mobile.locator('[data-action="low"]').click();await mobile.locator('#close-command').click();
+  assert.deepEqual(await snapshot(mobile),mobileBefore);
+  await mobile.locator('#mobile-bench').click();await mobile.locator('[data-pitcher="2"]').click();await mobile.locator('#cancel').click();assert(await mobile.locator('#command-dialog').isVisible());
+  await mobile.locator('[data-pitcher="2"]').click();await mobile.locator('#confirm').click();assert.equal(await mobile.locator('#command-dialog').isVisible(),false);assert.equal((await snapshot(mobile)).plays,mobileBefore.plays);assert.match(await mobile.locator('#matchup').innerText(),/速水/);
+  await mobile.locator('#mobile-tactics').click();await mobile.locator('#advance').click();await mobile.waitForFunction(()=>!document.querySelector('#mobile-tactics').disabled);assert.equal(await mobile.locator('#command-dialog').isVisible(),false);assert.equal((await snapshot(mobile)).plays,mobileBefore.plays+1);
+  await mobile.setViewportSize({width:1365,height:900});assert(await mobile.locator('#panel').isVisible());await mobile.setViewportSize({width:390,height:667});assert.equal(await mobile.locator('#panel').isVisible(),false);
+  for(let n=0;n<100&&!(await snapshot(mobile)).done;n++){await mobile.locator('#mobile-tactics').click();await mobile.locator('#advance').click();await mobile.waitForFunction(()=>!document.querySelector('#mobile-tactics').disabled);}
+  assert((await snapshot(mobile)).done);await mobile.locator('#result-record').click();assert(await mobile.locator('#command-dialog').isVisible());assert.match(await mobile.locator('#panel').innerText(),/あなたの采配を振り返る/);
+  await mobile.reload();await mobile.locator('#resume-game').click();assert(await mobile.locator('#command-dialog').isVisible());assert.match(await mobile.locator('#panel').innerText(),/イニング別スコア/);
   if(process.env.BENCH_QA_DIR)await mobile.screenshot({path:join(process.env.BENCH_QA_DIR,'game-mobile.png'),fullPage:true});flows++;
   if(process.env.BENCH_QA_DIR){const desktop=await page();await desktop.screenshot({path:join(process.env.BENCH_QA_DIR,'start-desktop.png'),fullPage:true});}
   assert.deepEqual(errors,[]);console.log('Browser smoke: '+flows+' flows passed; no page or console errors. Desktop 1365×900 / mobile 390×844.');

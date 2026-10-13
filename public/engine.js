@@ -26,7 +26,8 @@
     advance: { name: 'あと1点を取りにいく', home: 2, away: 2, inning: 8, half: 'home', outs: 0, order: 1, bases: [null,0,null], text: '8回裏、同点、無死二塁。送るか、打たせるか。' },
     ace: { name: 'エースに託すか', home: 3, away: 2, inning: 8, half: 'away', outs: 1, order: 3, bases: [2,1,null], pitches: 105, text: '8回表、1点リード、1死一・二塁。疲れた先発を続投させるか。' },
     last: { name: '最後の切り札', home: 2, away: 3, inning: 9, half: 'home', outs: 2, order: 7, bases: [6,5,null], text: '9回裏、1点差、2死一・二塁。巧打か、一発か。' },
-    miracle: { name: '奇跡の逆転へ', home: 2, away: 6, inning: 9, half: 'home', outs: 0, order: 3, bases: [2,1,0], text: '9回裏、4点差、無死満塁。つないで追うか、一発で追いつくか。' }
+    miracle: { name: '奇跡の逆転へ', home: 2, away: 6, inning: 9, half: 'home', outs: 0, order: 3, bases: [2,1,0], text: '9回裏、4点差、無死満塁。つないで追うか、一発で追いつくか。' },
+    protect: { name: '同点の9回を守る', home: 2, away: 2, inning: 9, half: 'away', outs: 1, order: 4, bases: [null,null,3], text: '9回表、同点、1死三塁。定位置か、前進守備か。1点を防ぐ一手を選ぶ。' }
   };
   // Ratings describe the starting task, not a guaranteed success percentage.
   const difficulty = {
@@ -36,7 +37,8 @@
     advance:[2,'無死二塁から、送りバントなど複数の選択肢がある。'],
     ace:[4,'終盤のピンチで、疲れた先発と救援の判断が必要。'],
     last:[5,'9回2死。アウトになると終了する最後の攻撃。'],
-    miracle:[5,'満塁の好機だが、9回に4点差を追う必要がある。']
+    miracle:[5,'満塁の好機だが、9回に4点差を追う必要がある。'],
+    protect:[3,'同点の9回、三塁走者を迎え入れない守備と投球を考える。']
   };
   for(const [key,[rating,reason]] of Object.entries(difficulty))Object.assign(scenarios[key],{difficulty:rating,difficultyReason:reason});
   function batter(id, name, hand, pos, contact, power, speed, defense, eye, bunt, trait) {
