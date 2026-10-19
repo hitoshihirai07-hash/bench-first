@@ -2,7 +2,7 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.BenchMotion=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
   const bases=[[50,84],[84.5,52.4],[50,38.2],[15.4,52.4],[50,84]],mound=[50,52.5];
-  const labels={single:'ヒット！',double:'二塁打！',triple:'三塁打！',hr:'ホームラン！',bb:'フォアボール',k:'三振',ground:'内野ゴロ',fly:'フライアウト',sac:'犠牲フライ！',error:'エラー',dp:'ダブルプレー',bunt:'送りバント成功',buntOut:'バント失敗',steal:'盗塁成功！',caught:'盗塁失敗'};
+  const labels={single:'ヒット！',double:'二塁打！',triple:'三塁打！',hr:'ホームラン！',bb:'フォアボール',k:'三振',ground:'内野ゴロ',fly:'フライアウト',sac:'犠牲フライ！',error:'エラー',dp:'ダブルプレー',bunt:'送りバント成功',buntOut:'バント失敗',steal:'盗塁成功！',caught:'盗塁失敗',intentional:'申告敬遠'};
   function plan(play){
     const runners=[];const steal=['steal','caught'].includes(play.outcome);
     const starters=play.beforeBases.map((p,i)=>p?{p,from:i+1}:null).filter(Boolean);
@@ -28,7 +28,7 @@
   function frames(points){return points.map((p,i)=>({left:p[0]+'%',top:p[1]+'%',offset:points.length===1?0:i/(points.length-1)}));}
   async function run(play,speed='normal',reduced=false){
     const layer=document.getElementById('motion-layer'),flash=document.getElementById('play-flash'),field=document.getElementById('field');
-    if(speed==='none'||reduced)return;
+    if(speed==='none'||reduced||play.outcome==='intentional')return; // No pitch to animate.
     const duration=speed==='fast'?500:play.outcome==='hr'?1950:1550,p=plan(play),animations=[];
     layer.replaceChildren();field.classList.add('playing');layer.dataset.outcome=play.outcome;
     const ball=document.createElement('span');ball.className='motion-ball';layer.append(ball);

@@ -15,7 +15,8 @@
     steal:'<circle cx="15" cy="4" r="2"/><path d="m8 11 5-4 4 5 5 1m-9-6-2 9-6 5m6-5 6 2 1 5M3 9h4M1 13h5"/>',
     normal:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18"/>',
     strikeout:'<path d="M6 3v18M20 3 6 14m6-6 9 13"/>',
-    low:'<path d="M4 4h16v16H4zM7 15h10m-5-8v8m-3-3 3 3 3-3"/>'
+    low:'<path d="M4 4h16v16H4zM7 15h10m-5-8v8m-3-3 3 3 3-3"/>',
+    intentional:'<path d="M4 7h18M7 4l-3 3 3 3M4 19h18m-3-3 3 3-3 3"/>'
   };
   function icon(key){return '<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[key]||icons.normal)+'</svg>';}
   function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -61,6 +62,8 @@
   function renderTactics(){
     if(game.done){$('panel').innerHTML='<div class="results-inline"><h3>'+({win:'勝利',loss:'敗戦',draw:'引き分け'}[game.result])+'</h3><p>'+resultTitle()+'<br>試合の記録から、一手を振り返ろう。</p><button class="primary" id="view-result">結果と振り返りを見る</button><button class="small-button" id="new-game">別の試合へ</button></div>';$('view-result').onclick=showResult;$('new-game').onclick=showSetup;return;}
     const offense=game.half==='home',steal=G.stealInfo(game),defense=pendingDefense||game.defense;
+    const opposingLineup=G.batting(game),current=G.currentBatter(game);
+    const nextBatter=opposingLineup.lineup[(opposingLineup.order+1)%9];
     const choices=offense?[
       ['contact','ミート重視','つなぐ打撃で、出塁を狙う。','三振は減るが、本塁打も減る。',true],
       ['power','長打狙い','ひと振りで、試合を動かす。','本塁打増。三振も増える。',true],
@@ -70,11 +73,17 @@
       ['normal','バランス','投手の持ち味で勝負する。','四球と長打のリスクを均衡。',true],
       ['strikeout','三振を狙う','走者を動かさずに抑える。','三振増。四球・球数も増。',true],
       ['contact','打たせて取る','四球を減らし、守備に託す。','安打のリスクは上がる。',true],
-      ['low','低めで勝負','長打を抑えてゴロを狙う。','本塁打減。四球は増える。',true]
+      ['low','低めで勝負','長打を抑えてゴロを狙う。','本塁打減。四球は増える。',true],
+      ['intentional','申告敬遠','この打者と勝負せず、一塁を与える。',
+       '現在：'+current.name+'（ミート '+current.contact+'／長打 '+current.power+'）'+
+       ' → 次打者：'+nextBatter.name+'（ミート '+nextBatter.contact+'／長打 '+nextBatter.power+'）'+
+       (game.bases.every(Boolean)?' · 満塁では押し出し1点。':
+        !game.bases[0]&&game.bases[2]?' · 一・三塁となり併殺も狙える。':
+        ' · 押し出される走者だけが進塁。'),true]
     ];
     if(!choices.some(c=>c[0]===selected&&c[4]))selected=offense?'contact':'normal';
     for(const c of choices){
-      if(['bunt','steal'].includes(c[0]))continue;
+      if(['bunt','steal','intentional'].includes(c[0]))continue;
       const p=G.matchupProbabilities(pendingDefense?{...game,defense}:game,c[0]),hit=p.single+p.double+p.triple+p.hr,pct=v=>Math.round(v*100)+'%';
       c[3]+='<br><span class="chance-preview">'+(offense?'出塁目安 '+pct(hit+p.bb+p.error)+' · 本塁打 '+pct(p.hr):'被安打 '+pct(hit)+' · 三振 '+pct(p.k)+' · 四球 '+pct(p.bb))+'</span>';
     }
@@ -110,7 +119,7 @@
   function reviewCardHTML(card){
     const b=card.before,r=card.result,gap=b.score.home-b.score.away;
     const score=gap===0?'同点':Math.abs(gap)+'点'+(gap>0?'リード':'ビハインド');
-    const outcomes={single:'ヒット',double:'二塁打',triple:'三塁打',hr:'ホームラン',bb:'フォアボール',k:'三振',ground:'内野ゴロ',fly:'フライアウト',sac:'犠牲フライ',error:'エラーで出塁',dp:'併殺',bunt:'送りバント成功',buntOut:'送りバント失敗',steal:'盗塁成功',caught:'盗塁失敗'};
+    const outcomes={single:'ヒット',double:'二塁打',triple:'三塁打',hr:'ホームラン',bb:'フォアボール',k:'三振',ground:'内野ゴロ',fly:'フライアウト',sac:'犠牲フライ',error:'エラーで出塁',dp:'併殺',bunt:'送りバント成功',buntOut:'送りバント失敗',steal:'盗塁成功',caught:'盗塁失敗',intentional:'申告敬遠'};
     const next=r.finished?'試合終了':r.changedHalf?'攻守交代':r.outs+'死・'+reviewBases(r.bases);
     const result=(outcomes[r.outcome]||'プレー終了')+'／'+next+'。'+(r.runs>0?r.runs+'点が入りました。':'')+' サンライズ '+r.score.home+' − '+r.score.away+' ブルーウェーブ';
     return '<article class="review-card"><h4>'+esc(b.inning)+'回'+(b.half==='home'?'裏':'表')+' · '+esc(b.outs)+'死 · '+esc(score)+'</h4><dl><dt>状況</dt><dd>'+esc(reviewBases(b.bases))+'<br>'+esc(b.batter.name)+' 対 '+esc(b.pitcher.name)+'（'+esc(b.pitcher.pitches)+'球）</dd><dt>選択</dt><dd><ul>'+card.choices.map(c=>'<li>'+esc(c)+'</li>').join('')+'</ul></dd><dt>直後</dt><dd>'+esc(result)+'</dd></dl>'+(card.cpuChanges.length?'<details class="review-cpu"><summary>選ぶ前の相手の交代</summary>'+card.cpuChanges.map(c=>'<p>'+esc(c)+'</p>').join('')+'</details>':'')+'</article>';
@@ -168,7 +177,7 @@
     }catch(error){console.error(error);toast('演出を省略して、試合を続けます。');}
     finally{
       controls.forEach(el=>el.disabled=false);busy=false;
-      if(oldHalf!==game.half)selected=game.half==='home'?'contact':'normal';
+      if(action==='intentional'||oldHalf!==game.half)selected=game.half==='home'?'contact':'normal';
       render();if(game.done)showResult();else (mobileMedia.matches?$('mobile-tactics'):$('advance'))?.focus({preventScroll:true});
     }
   }
