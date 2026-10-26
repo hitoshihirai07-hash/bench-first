@@ -12,6 +12,7 @@
     contact:'<path d="m6 20 11-13 3 3L8 22zM17 7l2-3 3 3-2 3M5 22l-2-2"/>',
     power:'<path d="m3 21 11-11 4 4L7 23zM14 10l4-7 5 5-5 6M4 6l2-3m1 5 3-1m9 12 2 2"/>',
     bunt:'<path d="m4 16 16-6 2 4-17 4z"/><circle cx="7" cy="6" r="2"/>',
+    squeeze:'<path d="m4 16 16-6 2 4-17 4z"/><path d="M4 22l5-5m10 0 4 5"/>',
     steal:'<circle cx="15" cy="4" r="2"/><path d="m8 11 5-4 4 5 5 1m-9-6-2 9-6 5m6-5 6 2 1 5M3 9h4M1 13h5"/>',
     normal:'<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18"/>',
     strikeout:'<path d="M6 3v18M20 3 6 14m6-6 9 13"/>',
@@ -26,7 +27,7 @@
     if(s&&[1,G.VERSION].includes(s.version)&&G.scenarios[s.scenario]&&(s.opponent===undefined||Object.prototype.hasOwnProperty.call(G.opponentTypes,s.opponent))&&(!s.daily||G.opponentType(s)==='balanced')&&s.inning>=7&&s.inning<=9&&['home','away'].includes(s.half)&&s.outs>=0&&s.outs<3&&s.bases.length===3&&Array.isArray(s.log)&&Array.isArray(s.decisions)&&Number.isFinite(s.rng)&&['home','away'].every(k=>Number.isFinite(s.score[k])&&s.lines[k].length===9&&s.teams[k].lineup.length===9&&s.teams[k].pitchers[s.teams[k].pitcherIndex]&&Array.isArray(s.teams[k].bench))){G.currentBatter(s);G.currentPitcher(s);s.version=G.VERSION;s.opponent=G.opponentType(s);hasSavedGame=true;return s;}
     }catch{}return G.createGame();}
   function history(){const h=read(HISTORY_KEY,[]);return Array.isArray(h)?h.filter(x=>x&&['win','loss','draw'].includes(x.result)).slice(-100):[];}
-  function remember(){const h=history();if(h.some(x=>x.id===game.id))return;h.push({id:game.id,result:game.result,home:game.score.home,away:game.score.away,scenario:game.scenario,opponent:G.opponentType(game),date:new Date().toISOString(),daily:game.daily||null,balanceRevision:game.balanceRevision||null});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-100)));}catch{storageOK=false;}}
+  function remember(){const h=history();if(h.some(x=>x.id===game.id))return;h.push({id:game.id,result:game.result,home:game.score.home,away:game.score.away,scenario:game.scenario,opponent:G.opponentType(game),date:new Date().toISOString(),daily:game.daily||null,squeeze:game.stats.home.squeeze||{attempts:0,success:0,fail:0},balanceRevision:game.balanceRevision||null});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-100)));}catch{storageOK=false;}}
   function statsData(){return T.summarize(history(),G.scenarios,G.BALANCE_REVISION);}
   function sceneStats(data,key,opponent){const item=data.byScenario[key];return opponent==='all'?item.all:item.opponents[opponent]||item.all;}
   function showStats(focus='',preferred='all'){
@@ -35,7 +36,7 @@
     openDialog(dialogHead('シナリオ別戦績')+'<p class="dialog-text">この端末の直近100試合から集計しています。自由挑戦と共通のお題は別集計です。</p>'+
       '<label class="link-label" for="stats-opponent">相手CPU</label><select id="stats-opponent" class="link-select"><option value="all">全タイプ</option>'+
       Object.entries(G.opponentTypes).map(([key,o])=>'<option value="'+key+'">'+esc(o.name)+'</option>').join('')+'</select>'+
-      '<p id="stats-summary" class="record-totals" aria-live="polite"></p><div id="stats-list" class="stats-list" aria-live="polite"></div>'+
+      '<p id="stats-summary" class="record-totals" aria-live="polite"></p><p class="record-caption">スクイズ：'+data.squeeze.success+'回成功／'+data.squeeze.attempts+'回選択（失敗'+data.squeeze.fail+'回）</p><div id="stats-list" class="stats-list" aria-live="polite"></div>'+
       '<p class="record-caption">今日の共通のお題（現行版）：'+T.display(data.daily)+'／'+data.daily.total+'試合</p>'+
       (data.previousRevision?'<p class="record-caption">以前のバランス版 '+data.previousRevision+'試合は、条件が異なるため集計から除外しています。</p>':'')+
       '<p class="record-caption">この端末内の記録です。別端末とは同期されず、ブラウザデータの削除で消えます。</p>'+
@@ -96,6 +97,7 @@
       ['contact','ミート重視','つなぐ打撃で、出塁を狙う。','三振は減るが、本塁打も減る。',true],
       ['power','長打狙い','ひと振りで、試合を動かす。','本塁打増。三振も増える。',true],
       ['bunt','送りバント','アウトと引き換えに進める。',G.canBunt(game)?'成功目安 '+Math.round(G.buntChance(game)*100)+'% · バント能力 '+G.currentBatter(game).bunt:'2死・三塁走者ありでは不可。',G.canBunt(game)],
+      ['squeeze','スクイズ','三塁走者を本塁へ。成功なら1点。',G.canSqueeze(game)?'成功目安 '+Math.round(G.squeezeChance(game)*100)+'% · バント能力 '+G.currentBatter(game).bunt+(G.opponentType(game)==='defense'?' · 守備型CPUは警戒':''):'三塁走者が必要。2死では選べません。',G.canSqueeze(game)],
       ['steal','盗塁','走力を生かして、次の塁へ。',steal?steal.runner.name.split(' ')[0]+'の'+(steal.base===0?'二':'三')+'盗成功目安 '+Math.round(steal.chance*100)+'%':'走者・空いている塁が必要。',!!steal]
     ]:[
       ['normal','バランス','投手の持ち味で勝負する。','四球と長打のリスクを均衡。',true],
@@ -109,13 +111,14 @@
         !game.bases[0]&&game.bases[2]?' · 一・三塁となり併殺も狙える。':
         ' · 押し出される走者だけが進塁。'),true]
     ];
+    if(offense&&!G.canSqueeze(game))choices.splice(3,1);
     if(!choices.some(c=>c[0]===selected&&c[4]))selected=offense?'contact':'normal';
     for(const c of choices){
-      if(['bunt','steal','intentional'].includes(c[0]))continue;
+      if(['bunt','squeeze','steal','intentional'].includes(c[0]))continue;
       const p=G.matchupProbabilities(pendingDefense?{...game,defense}:game,c[0]),hit=p.single+p.double+p.triple+p.hr,pct=v=>Math.round(v*100)+'%';
       c[3]+='<br><span class="chance-preview">'+(offense?'出塁目安 '+pct(hit+p.bb+p.error)+' · 本塁打 '+pct(p.hr):'被安打 '+pct(hit)+' · 三振 '+pct(p.k)+' · 四球 '+pct(p.bb))+'</span>';
     }
-    $('panel').innerHTML='<div class="tactics">'+choices.map(c=>'<button class="tactic '+(selected===c[0]?'selected':'')+'" data-action="'+c[0]+'" aria-pressed="'+(selected===c[0])+'" '+(!c[4]?'disabled':'')+'><div class="tactic-top">'+icon(c[0])+'<h3>'+c[1]+'</h3></div><p>'+c[2]+'</p><p class="pro">'+c[3]+'</p></button>').join('')+'</div>'+(offense?'':'<div class="defense-select"><span>守備位置</span><button data-defense="normal" class="'+(defense==='normal'?'selected':'')+'" aria-pressed="'+(defense==='normal')+'">定位置</button><button data-defense="in" class="'+(defense==='in'?'selected':'')+'" aria-pressed="'+(defense==='in')+'">前進守備</button></div>')+'<p class="action-hint">'+(offense?(selected==='bunt'?'送りバントは2死・三塁走者ありでは選べません。失敗時は打者アウト。':selected==='steal'?'盗塁は打席を消費しません。失敗するとアウトが増えます。':'「ベンチ」から代打・代走を選べます。交代後は再出場できません。'):(defense==='in'?'前進守備は内野ゴロでの生還を防ぎますが、安打が増えます。':'疲労が大きいほど打たれやすくなります。「ベンチ」で継投できます。'))+'</p><div class="primary-row"><button class="primary" id="advance" '+(busy?'disabled':'')+'>'+(busy?'プレー中…':'この作戦で進める')+'<span class="arrow" aria-hidden="true">→</span></button></div>';
+    $('panel').innerHTML='<div class="tactics">'+choices.map(c=>'<button class="tactic '+(selected===c[0]?'selected':'')+'" data-action="'+c[0]+'" aria-pressed="'+(selected===c[0])+'" '+(!c[4]?'disabled':'')+'><div class="tactic-top">'+icon(c[0])+'<h3>'+c[1]+'</h3></div><p>'+c[2]+'</p><p class="pro">'+c[3]+'</p></button>').join('')+'</div>'+(offense?'':'<div class="defense-select"><span>守備位置</span><button data-defense="normal" class="'+(defense==='normal'?'selected':'')+'" aria-pressed="'+(defense==='normal')+'">定位置</button><button data-defense="in" class="'+(defense==='in'?'selected':'')+'" aria-pressed="'+(defense==='in')+'">前進守備</button></div>')+'<p class="action-hint">'+(offense?(selected==='bunt'?'送りバントは2死・三塁走者ありでは選べません。失敗時は打者アウト。':selected==='squeeze'?'スクイズは三塁走者がいる0・1死限定。失敗時は本塁アウトや打者アウトの危険があります。':selected==='steal'?'盗塁は打席を消費しません。失敗するとアウトが増えます。':'「ベンチ」から代打・代走を選べます。交代後は再出場できません。'):(defense==='in'?'前進守備は内野ゴロでの生還を防ぎますが、安打が増えます。':'疲労が大きいほど打たれやすくなります。「ベンチ」で継投できます。'))+'</p><div class="primary-row"><button class="primary" id="advance" '+(busy?'disabled':'')+'>'+(busy?'プレー中…':'この作戦で進める')+'<span class="arrow" aria-hidden="true">→</span></button></div>';
     document.querySelectorAll('[data-action]').forEach(el=>el.onclick=()=>{selected=el.dataset.action;renderTactics();document.querySelector('[data-action="'+selected+'"]').focus({preventScroll:true});});
     document.querySelectorAll('[data-defense]').forEach(el=>el.onclick=()=>{if(busy)return;if(commandDialog.open){pendingDefense=el.dataset.defense;renderTactics();document.querySelector('[data-defense="'+pendingDefense+'"]').focus({preventScroll:true});}else{G.setDefense(game,el.dataset.defense);save();render();}});
     $('advance').onclick=advance;
@@ -147,7 +150,7 @@
   function reviewCardHTML(card){
     const b=card.before,r=card.result,gap=b.score.home-b.score.away;
     const score=gap===0?'同点':Math.abs(gap)+'点'+(gap>0?'リード':'ビハインド');
-    const outcomes={single:'ヒット',double:'二塁打',triple:'三塁打',hr:'ホームラン',bb:'フォアボール',k:'三振',ground:'内野ゴロ',fly:'フライアウト',sac:'犠牲フライ',error:'エラーで出塁',dp:'併殺',bunt:'送りバント成功',buntOut:'送りバント失敗',steal:'盗塁成功',caught:'盗塁失敗',intentional:'申告敬遠'};
+    const outcomes={single:'ヒット',double:'二塁打',triple:'三塁打',hr:'ホームラン',bb:'フォアボール',k:'三振',ground:'内野ゴロ',fly:'フライアウト',sac:'犠牲フライ',error:'エラーで出塁',dp:'併殺',bunt:'送りバント成功',buntOut:'送りバント失敗',squeeze:'スクイズ成功',squeezeHomeOut:'スクイズ失敗・本塁アウト',squeezeMiss:'スクイズ空振り・本塁アウト',squeezeFoul:'スクイズ失敗・スリーバント失敗',squeezeBuntOut:'スクイズ失敗・打者アウト',steal:'盗塁成功',caught:'盗塁失敗',intentional:'申告敬遠'};
     const next=r.finished?'試合終了':r.changedHalf?'攻守交代':r.outs+'死・'+reviewBases(r.bases);
     const result=(outcomes[r.outcome]||'プレー終了')+'／'+next+'。'+(r.runs>0?r.runs+'点が入りました。':'')+' サンライズ '+r.score.home+' − '+r.score.away+' ブルーウェーブ';
     return '<article class="review-card"><h4>'+esc(b.inning)+'回'+(b.half==='home'?'裏':'表')+' · '+esc(b.outs)+'死 · '+esc(score)+'</h4><dl><dt>状況</dt><dd>'+esc(reviewBases(b.bases))+'<br>'+esc(b.batter.name)+' 対 '+esc(b.pitcher.name)+'（'+esc(b.pitcher.pitches)+'球）</dd><dt>選択</dt><dd><ul>'+card.choices.map(c=>'<li>'+esc(c)+'</li>').join('')+'</ul></dd><dt>直後</dt><dd>'+esc(result)+'</dd></dl>'+(card.cpuChanges.length?'<details class="review-cpu"><summary>選ぶ前の相手の交代</summary>'+card.cpuChanges.map(c=>'<p>'+esc(c)+'</p>').join('')+'</details>':'')+'</article>';
@@ -157,7 +160,7 @@
     return '<section class="review-section" aria-label="采配の振り返り"><h3>あなたの采配を振り返る</h3><p class="record-caption">状況 → 選択 → 直後の結果。'+(items.length?'直近'+recent.length+'プレーを表示（全'+items.length+'件）。':'')+'結果だけで采配の良し悪しは決まりません。</p>'+(!game.review||game.review.legacy?'<p class="review-legacy">以前の保存には詳細記録がありません。更新後に選んだ采配から記録します。</p>':'')+'<div class="review-cards">'+(recent.length?recent.map(reviewCardHTML).join(''):'<p class="empty-note">プレーを進めると、選んだ采配と直後の結果がここに残ります。</p>')+'</div>'+(expand&&items.length>limit?'<details class="review-more"><summary>それ以前の'+(items.length-limit)+'プレーを見る</summary><div class="review-cards">'+items.slice(0,-limit).reverse().map(reviewCardHTML).join('')+'</div></details>':'')+'</section>';
   }
   function renderRecord(){
-    $('panel').innerHTML='<div class="record-scroll">'+scoreTable()+reviewHTML(3,true)+'<p class="record-caption">操作開始後：サンライズ '+game.stats.home.h+'安打 / '+game.stats.home.bb+'四球 / '+game.stats.home.hr+'本塁打</p><details><summary class="record-caption">現在のサンライズ打順・守備</summary>'+game.teams.home.lineup.map((p,i)=>'<div class="log-row"><small>'+(i+1)+'番</small><span>'+p.name+'（'+G.positionAt(game.teams.home,i)+'）'+(G.positionAt(game.teams.home,i)!=='指'&&!p.pos.includes(G.positionAt(game.teams.home,i))?' · 守備適性外':'')+'</span></div>').join('')+'</details>'+logHTML(game.log.slice().reverse())+'</div>';
+    $('panel').innerHTML='<div class="record-scroll">'+scoreTable()+reviewHTML(3,true)+'<p class="record-caption">操作開始後：サンライズ '+game.stats.home.h+'安打 / '+game.stats.home.bb+'四球 / '+game.stats.home.hr+'本塁打<br>スクイズ：'+(game.stats.home.squeeze?.success||0)+'回成功／'+(game.stats.home.squeeze?.attempts||0)+'回選択（失敗'+(game.stats.home.squeeze?.fail||0)+'回）</p><details><summary class="record-caption">現在のサンライズ打順・守備</summary>'+game.teams.home.lineup.map((p,i)=>'<div class="log-row"><small>'+(i+1)+'番</small><span>'+p.name+'（'+G.positionAt(game.teams.home,i)+'）'+(G.positionAt(game.teams.home,i)!=='指'&&!p.pos.includes(G.positionAt(game.teams.home,i))?' · 守備適性外':'')+'</span></div>').join('')+'</details>'+logHTML(game.log.slice().reverse())+'</div>';
   }
   function render(){if(!activeGame)return;G.prepareTurn(game);renderScore();renderField();$('command-title').innerHTML=game.done?'最後の一球まで、<br>あなたの采配。':game.half==='home'?'あなたの采配で、<br>流れを変える。':'この一球を、<br>誰に託す？';$('phase').textContent=game.done?'試合終了':(game.half==='home'?'攻撃中':'守備中')+' / '+game.outs+'死'+(baseText()==='走者なし'?'走者なし':baseText());$('phase').className='phase '+(game.half==='away'?'defend':'');
     const changes=game.done?[]:game.turnChanges||[];$('cpu-changes').hidden=!changes.length;$('cpu-changes').innerHTML=changes.length?'<strong>相手の交代を確認してから、采配を選びましょう。</strong>'+changes.map(l=>'<p>'+esc(l.text)+'</p>').join(''):'';
@@ -244,7 +247,7 @@
     selectedOpponent=G.opponentType(game);
     selected=game.half==='home'?'contact':'normal';tab='tactics';lineupTeam=game.half;benchMode=game.half==='home'?'pinch':'pitcher';benchTarget=game.teams.home.order;$('dialog').close();activateGame();window.scrollTo({top:0,behavior:'instant'});
   }
-  function showHelp(){openDialog(dialogHead('監督の仕事は、選ぶこと。')+'<div class="dialog-text"><p><strong>あなたは後攻のサンライズ。選んだ場面から9回終了までを戦います。</strong>打撃・投球のタイミング操作はありません。</p><ol><li>スマホは画面下の「采配」から作戦を開き、PCは右側の「采配」で作戦を選び、<strong>この作戦で進める</strong>を押すと1打席が進みます。</li><li>3アウトで攻守交代。守備では投球方針を選びます。</li><li>スマホは画面下の「交代」、PCは「ベンチ」で代打・代走・継投・守備交代。交代は確認後に確定します。</li><li>「打順」で両チームの打順を確認。選手名を押すと全能力が開きます。</li><li>「記録」でスコアと采配を振り返れます。</li></ol><p><strong>能力は100段階。</strong>ミート・長打・走力・守備・選球眼・バント、投手の球威・制球・疲労・左右相性が結果に影響します。良い選択でも必ず成功するわけではありません。</p><p><strong>守備適性に注意。</strong>例えば控え捕手を代打に使うと、打力が上がっても捕手の守備力が下がります。投手の疲労は球数とスタミナで増加します。</p><p>試作版は全試合DH制。送りバントは2死・三塁走者ありでは不可、盗塁は二盗・三盗のみです。走塁・併殺は簡略化しています。実際の試合を予測するものではありません。</p><p>自由に挑戦では、場面を選ぶ前に相手をバランス型・長打型・守備継投型から選べます。開始前に強みと特徴を確認しましょう。保存・同じ場面への再挑戦は選んだ相手を引き継ぎます。</p><p>「今日の共通のお題」は相手をバランス型で統一し、日本時間の日付で切り替わります。同じ版・同じお題・同じ采配なら結果を再現できます。演出は標準／速い／なしから選べます。端末で動きを減らす設定をしている場合も演出を省略します。</p><p>「リンク」から今日・指定日・シナリオのリンクをコピーできます。試合終了後は結果のコピー・対応端末の共有・PNG画像の保存ができます。</p><p>進行と直近100試合の戦績をこの端末に保存します。ブラウザのデータ削除で消えます。公開URLとローカルファイルの保存は別です。</p></div><button class="primary" id="help-done">采配を始めよう</button>');$('help-done').onclick=()=>$('dialog').close();}
+  function showHelp(){openDialog(dialogHead('監督の仕事は、選ぶこと。')+'<div class="dialog-text"><p><strong>あなたは後攻のサンライズ。選んだ場面から9回終了までを戦います。</strong>打撃・投球のタイミング操作はありません。</p><ol><li>スマホは画面下の「采配」から作戦を開き、PCは右側の「采配」で作戦を選び、<strong>この作戦で進める</strong>を押すと1打席が進みます。</li><li>3アウトで攻守交代。守備では投球方針を選びます。</li><li>スマホは画面下の「交代」、PCは「ベンチ」で代打・代走・継投・守備交代。交代は確認後に確定します。</li><li>「打順」で両チームの打順を確認。選手名を押すと全能力が開きます。</li><li>「記録」でスコアと采配を振り返れます。</li></ol><p><strong>能力は100段階。</strong>ミート・長打・走力・守備・選球眼・バント、投手の球威・制球・疲労・左右相性が結果に影響します。良い選択でも必ず成功するわけではありません。</p><p><strong>守備適性に注意。</strong>例えば控え捕手を代打に使うと、打力が上がっても捕手の守備力が下がります。投手の疲労は球数とスタミナで増加します。</p><p>試作版は全試合DH制。送りバントは2死・三塁走者ありでは不可。スクイズは0・1死で三塁走者がいるときだけ選べます。失敗すると走者・打者がアウトになる場合があります。盗塁は二盗・三盗のみです。走塁・併殺は簡略化しています。実際の試合を予測するものではありません。</p><p>自由に挑戦では、場面を選ぶ前に相手をバランス型・長打型・守備継投型から選べます。開始前に強みと特徴を確認しましょう。保存・同じ場面への再挑戦は選んだ相手を引き継ぎます。</p><p>「今日の共通のお題」は相手をバランス型で統一し、日本時間の日付で切り替わります。同じ版・同じお題・同じ采配なら結果を再現できます。演出は標準／速い／なしから選べます。端末で動きを減らす設定をしている場合も演出を省略します。</p><p>「リンク」から今日・指定日・シナリオのリンクをコピーできます。試合終了後は結果のコピー・対応端末の共有・PNG画像の保存ができます。</p><p>進行と直近100試合の戦績をこの端末に保存します。ブラウザのデータ削除で消えます。公開URLとローカルファイルの保存は別です。</p></div><button class="primary" id="help-done">采配を始めよう</button>');$('help-done').onclick=()=>$('dialog').close();}
   function shareText(){return S.text(S.resultData(game,G));}
   async function copyText(value){
     try{await navigator.clipboard.writeText(value);toast('コピーしました。');}

@@ -18,8 +18,8 @@ const snapshot=p=>p.evaluate(()=>JSON.parse(localStorage.getItem('bench-first-ga
 async function start(p,key){await p.locator('#choose-scenario').click();await p.locator('[data-scenario="'+key+'"]').click();assert.equal(await p.locator('#game-view').isVisible(),false);assert.match(await p.locator('.daily-card').innerText(),/難易度/);await p.locator('#scene-start').click();await p.locator('#animation-speed').selectOption('none');}
 try{
   const p=await page();assert.match(await p.title(),/ベンチからの一手/);assert(await p.locator('#start-screen').isVisible());assert.equal(await p.locator('#game-view').isVisible(),false);assert.equal(await p.locator('#scoreboard').textContent(),'');assert.equal(await snapshot(p),null);
-  await p.locator('#choose-scenario').click();assert.equal(await p.locator('.scenario .difficulty').count(),8);await p.locator('[data-scenario="last"]').click();await p.locator('#close-dialog').click();assert.equal(await p.locator('#game-view').isVisible(),false);flows++;
-  for(const key of ['chase','tie','lead','advance','ace','last','miracle','protect']){
+  await p.locator('#choose-scenario').click();assert.equal(await p.locator('.scenario .difficulty').count(),9);await p.locator('[data-scenario="last"]').click();await p.locator('#close-dialog').click();assert.equal(await p.locator('#game-view').isVisible(),false);flows++;
+  for(const key of ['chase','tie','lead','advance','ace','last','miracle','protect','squeeze']){
     const p=await page();await start(p,key);const initial=await snapshot(p);assert.equal(initial.scenario,key);assert(await p.locator('#matchup').isVisible());
     if(key==='chase'){
       await p.locator('#tab-bench').click();await p.locator('[data-sub="h10"]').click();await p.locator('#confirm').click();assert.match(await p.locator('#matchup').innerText(),/白石/);await p.locator('#tab-tactics').click();
@@ -28,6 +28,7 @@ try{
       await p.locator('#tab-bench').click();await p.locator('[data-pitcher="2"]').click();await p.locator('#confirm').click();assert.match(await p.locator('#matchup').innerText(),/速水/);await p.locator('#tab-tactics').click();
     }
     if(key==='last')assert(await p.locator('#cpu-changes').isVisible());
+    if(key==='squeeze'){assert(await p.locator('[data-action="squeeze"]').isEnabled());await p.locator('[data-action="squeeze"]').click();}
     for(let n=0;n<100;n++){
       const before=await snapshot(p);if(before.done)break;
       const ids=await p.locator('#matchup [data-player]').evaluateAll(els=>els.map(e=>e.dataset.player));
@@ -58,7 +59,7 @@ try{
   const old=await page();await old.evaluate(()=>{const s=BenchGame.createDailyGame('2026-10-02');delete s.balanceRevision;delete s.daily.balanceRevision;localStorage.setItem('bench-first-game-v1',JSON.stringify(s));localStorage.setItem('bench-first-history-v1',JSON.stringify([{id:'old-record',result:'loss',home:2,away:3,daily:s.daily}]));});
   await old.reload();assert(await old.locator('#saved-version-note').isVisible());assert.equal(await old.locator('#game-view').isVisible(),false);await old.locator('#resume-game').click();assert.match(await old.locator('#challenge-label').innerText(),/以前の保存位置/);await old.locator('#daily').click();assert.match(await old.locator('#dialog-content').innerText(),/保存中の完了記録：0回/);await old.locator('#close-dialog').click();
   await old.goto(url+'/?daily=2026-10-02&rules=02');await old.locator('#entry-start').click();assert.equal((await snapshot(old)).balanceRevision,'05');assert.doesNotMatch(await old.locator('#challenge-label').innerText(),/以前の保存位置/);flows++;
-  const invalid=await page();await invalid.goto(url+'/?scenario=unknown');assert.match(await invalid.locator('#dialog-content').innerText(),/見つかりません/);await invalid.locator('#entry-close').click();assert.equal(await invalid.locator('.scenario').count(),8);assert.equal(await invalid.locator('#game-view').isVisible(),false);flows++;
+  const invalid=await page();await invalid.goto(url+'/?scenario=unknown');assert.match(await invalid.locator('#dialog-content').innerText(),/見つかりません/);await invalid.locator('#entry-close').click();assert.equal(await invalid.locator('.scenario').count(),9);assert.equal(await invalid.locator('#game-view').isVisible(),false);flows++;
   const mobile=await page();await mobile.setViewportSize({width:390,height:844});assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   if(process.env.BENCH_QA_DIR)await mobile.screenshot({path:join(process.env.BENCH_QA_DIR,'start-mobile.png'),fullPage:true});
   await start(mobile,'ace');assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

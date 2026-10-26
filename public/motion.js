@@ -2,7 +2,7 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.BenchMotion=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
   'use strict';
   const bases=[[50,84],[84.5,52.4],[50,38.2],[15.4,52.4],[50,84]],mound=[50,52.5];
-  const labels={single:'ヒット！',double:'二塁打！',triple:'三塁打！',hr:'ホームラン！',bb:'フォアボール',k:'三振',ground:'内野ゴロ',fly:'フライアウト',sac:'犠牲フライ！',error:'エラー',dp:'ダブルプレー',bunt:'送りバント成功',buntOut:'バント失敗',steal:'盗塁成功！',caught:'盗塁失敗',intentional:'申告敬遠'};
+  const labels={single:'ヒット！',double:'二塁打！',triple:'三塁打！',hr:'ホームラン！',bb:'フォアボール',k:'三振',ground:'内野ゴロ',fly:'フライアウト',sac:'犠牲フライ！',error:'エラー',dp:'ダブルプレー',bunt:'送りバント成功',buntOut:'バント失敗',squeeze:'スクイズ成功！',squeezeHomeOut:'スクイズ・本塁アウト',squeezeMiss:'スクイズ空振り',squeezeFoul:'スクイズ・スリーバント失敗',squeezeBuntOut:'スクイズ失敗',steal:'盗塁成功！',caught:'盗塁失敗',intentional:'申告敬遠'};
   function plan(play){
     const runners=[];const steal=['steal','caught'].includes(play.outcome);
     const starters=play.beforeBases.map((p,i)=>p?{p,from:i+1}:null).filter(Boolean);
@@ -11,7 +11,7 @@
       let to=play.afterBases.findIndex(x=>x&&x.id===p.id)+1;
       const scored=play.scored.includes(p.id),out=play.outIds.includes(p.id);
       if(scored)to=4;
-      else if(out)to=play.outcome==='k'||play.outcome==='fly'||play.outcome==='sac'?from:Math.min(from+1,3);
+      else if(out)to=['squeezeHomeOut','squeezeMiss'].includes(play.outcome)?4:play.outcome==='k'||play.outcome==='fly'||play.outcome==='sac'||play.outcome==='squeezeFoul'||play.outcome==='squeezeBuntOut'?from:Math.min(from+1,3);
       else if(!to)to=from; // stranded or play ended on another runner's winning run
       const points=[];for(let i=from;i<=to;i++)points.push(bases[i]);
       if(!points.length)points.push(bases[from]);
@@ -22,7 +22,7 @@
     if(steal){const moved=runners.find(r=>r.points.length>1);ball=[bases[0],moved?moved.points.at(-1):bases[2]];}
     else if(['single','double','triple','hr','error','fly','sac'].includes(play.outcome))ball.push([50+d*14,48],deep);
     else if(play.outcome==='dp')ball.push([36,47],bases[2],bases[1]);
-    else if(['ground','bunt','buntOut'].includes(play.outcome))ball.push([43,65],bases[1]);
+    else if(['ground','bunt','buntOut','squeeze','squeezeHomeOut','squeezeMiss','squeezeFoul','squeezeBuntOut'].includes(play.outcome))ball.push([43,65],bases[1]);
     return {runners,ball,label:labels[play.outcome]||'プレー終了'};
   }
   function frames(points){return points.map((p,i)=>({left:p[0]+'%',top:p[1]+'%',offset:points.length===1?0:i/(points.length-1)}));}

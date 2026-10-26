@@ -27,7 +27,8 @@
     ace: { name: 'エースに託すか', home: 3, away: 2, inning: 8, half: 'away', outs: 1, order: 3, bases: [2,1,null], pitches: 105, text: '8回表、1点リード、1死一・二塁。疲れた先発を続投させるか。' },
     last: { name: '最後の切り札', home: 2, away: 3, inning: 9, half: 'home', outs: 2, order: 7, bases: [6,5,null], text: '9回裏、1点差、2死一・二塁。巧打か、一発か。' },
     miracle: { name: '奇跡の逆転へ', home: 2, away: 6, inning: 9, half: 'home', outs: 0, order: 3, bases: [2,1,0], text: '9回裏、4点差、無死満塁。つないで追うか、一発で追いつくか。' },
-    protect: { name: '同点の9回を守る', home: 2, away: 2, inning: 9, half: 'away', outs: 1, order: 4, bases: [null,null,3], text: '9回表、同点、1死三塁。定位置か、前進守備か。1点を防ぐ一手を選ぶ。' }
+    protect: { name: '同点の9回を守る', home: 2, away: 2, inning: 9, half: 'away', outs: 1, order: 4, bases: [null,null,3], text: '9回表、同点、1死三塁。定位置か、前進守備か。1点を防ぐ一手を選ぶ。' },
+    squeeze: { name: 'サヨナラの一手', home: 2, away: 2, inning: 9, half: 'home', outs: 1, order: 1, bases: [null,null,0], text: '9回裏、同点、1死三塁。スクイズか強攻か。勝負の一手を選ぶ。' }
   };
   const difficulty = {
     chase:[4,'1点差を追い、残りの攻撃で逆転を目指す。'],
@@ -37,7 +38,8 @@
     ace:[4,'終盤のピンチで、疲れた先発と救援の判断が必要。'],
     last:[5,'9回2死。アウトになると終了する最後の攻撃。'],
     miracle:[5,'満塁の好機だが、9回に4点差を追う必要がある。'],
-    protect:[3,'同点の9回、三塁走者を迎え入れない守備と投球を考える。']
+    protect:[3,'同点の9回、三塁走者を迎え入れない守備と投球を考える。'],
+    squeeze:[4,'スクイズか強攻か。成功すればサヨナラだが、失敗すると得点機を逃す。']
   };
   for(const [key,[rating,reason]] of Object.entries(difficulty))Object.assign(scenarios[key],{difficulty:rating,difficultyReason:reason});
   function batter(id, name, hand, pos, contact, power, speed, defense, eye, bunt, trait) {
@@ -166,6 +168,8 @@
     const d=dailySpec(date),s=createGame(d.scenario,d.seed);s.daily=d;s.id='daily-'+d.code+'-'+attemptId;return s;
   }
   function buntChance(s) {return canBunt(s)?clamp(.40+currentBatter(s).bunt*.005-(currentPitcher(s).stuff-70)*.001,.4,.88):null;}
+  function canSqueeze(s) {return !s.done&&s.half==='home'&&s.outs<2&&!!s.bases[2];}
+  function squeezeChance(s) {if(!canSqueeze(s))return null;const b=currentBatter(s),r=s.bases[2],p=currentPitcher(s),def=fieldDefense(fielding(s));return clamp(.23+b.bunt*.004+r.speed*.0026-p.stuff*.00065-def*.0011-(opponentType(s)==='defense'?.055:0),.22,.83);}
   function effectiveDefense(p,pos) {return pos==='指'?null:Math.round(p.defense*(p.pos.includes(pos)?1:.48));}
   function positionAt(t,index) {return (t.fieldPositions||positions)[index];}
   function fieldDefense(t) {return t.lineup.reduce((sum,p,i)=>sum+(effectiveDefense(p,positionAt(t,i))||0),0)/8;}
@@ -245,7 +249,54 @@
     completeReview(s);
     return {ok:true,events:s.log.slice(start),runs:s.lastPlay.runs,play:s.lastPlay};
   }
-  function step(s,action='contact') {if(s.done)return {ok:false};if(action==='intentional')return intentionalWalk(s);const offense=s.half==='home';const valid=offense?['contact','power','bunt','steal']:['normal','strikeout','contact','low'];if(!valid.includes(action)||(action==='bunt'&&!canBunt(s))||(action==='steal'&&!stealInfo(s)))return {ok:false};const start=s.log.length,oldScore=s.score[s.half];let attack=offense?action:cpuAttackChoice(s);const defend=offense?(s.bases[0]&&s.outs<2?'low':'normal'):action;const p=currentPitcher(s),b=currentBatter(s),st=s.stats[s.half];const probs=matchupProbabilities(s,action);s.lastPlay={half:s.half,inning:s.inning,batter:{id:b.id,name:b.name},pitcher:{id:p.id,name:p.name},beforeBases:s.bases.map(p=>p?{id:p.id,name:p.name}:null),outsBefore:s.outs,scoreBefore:s.score[s.half],scored:[],outIds:[],outcome:'',direction:(s.plays%3)-1};const labels={contact:offense?'ミート重視':'打たせて取る',power:'長打狙い',bunt:'送りバント',steal:'盗塁',normal:'バランス',strikeout:'三振を狙う',low:'低めで勝負'};queueReview(s,labels[action]+'：'+(offense?b.name:p.name));s.decisions.push({half:halfName(s),text:labels[action]+'：'+(offense?b.name:p.name)});if(action==='steal'){const info=stealInfo(s);p.pitches++;if(random(s)<info.chance){s.lastPlay.outcome='steal';s.bases[info.base+1]=info.runner;s.bases[info.base]=null;addLog(s,info.runner.name+'、'+(info.base===0?'二':'三')+'盗成功！','steal');}else{s.lastPlay.outcome='caught';s.lastPlay.outIds.push(info.runner.id);s.bases[info.base]=null;s.outs++;addLog(s,info.runner.name+'、盗塁失敗。アウト。','out');}endPlay(s,false);completeReview(s);return {ok:true,events:s.log.slice(start),play:s.lastPlay};}p.pitches+=3+Math.floor(random(s)*4)+(defend==='strikeout'?1:0);if(attack==='bunt'){const chance=buntChance(s);s.lastPlay.outIds.push(b.id);if(random(s)<chance){s.lastPlay.outcome='bunt';if(s.bases[1])s.bases[2]=s.bases[1];s.bases[1]=s.bases[0];s.bases[0]=null;s.outs++;addLog(s,b.name+'、送りバント成功。走者が進塁。','bunt');}else{s.lastPlay.outcome='buntOut';s.outs++;addLog(s,b.name+'、バント失敗。走者は進めず。','out');}}else{let roll=random(s),outcome='fly';for(const [key,v] of Object.entries(probs)){roll-=v;if(roll<0){outcome=key;break;}}s.lastPlay.outcome=outcome;if(['single','double','triple','error','fly'].includes(outcome))s.lastPlay.depth=clamp(random(s)*.85+b.power*.0015,0,1);const before=s.score[s.half];if(outcome==='bb'){walk(s,b);st.bb++;addLog(s,b.name+'、フォアボール。','walk');}else if(outcome==='hr'){const runs=1+s.bases.filter(Boolean).length;s.lastPlay.scored=s.bases.filter(Boolean).map(p=>p.id).concat(b.id);s.score[s.half]+=runs;s.lines[s.half][s.inning-1]+=runs;s.bases=[null,null,null];st.h++;st.hr++;addLog(s,b.name+'、'+(runs===1?'ソロ':runs===4?'満塁':runs+'ラン')+'ホームラン！','hr');}else if(['single','double','triple','error'].includes(outcome)){advanceHit(s,outcome==='double'?2:outcome==='triple'?3:1,b);if(outcome!=='error')st.h++;addLog(s,b.name+'、'+({single:'ヒット！',double:'二塁打！',triple:'三塁打！',error:'相手のエラーで出塁。'}[outcome]),outcome==='error'?'error':'hit');}else if(outcome==='k'){s.lastPlay.outIds.push(b.id);s.outs++;st.k++;addLog(s,b.name+'、空振り三振。','out');}else if(outcome==='ground'){const dpChance=clamp(.47-b.speed*.0025,.14,.43);if(s.bases[0]&&s.outs<2&&random(s)<dpChance){s.lastPlay.outcome='dp';s.lastPlay.outIds.push(s.bases[0].id,b.id);s.bases[0]=null;s.outs+=2;addLog(s,b.name+'、ゴロ併殺。ダブルプレー。','out');}else{const hadFirst=!!s.bases[0];s.outs++;s.lastPlay.outIds.push(b.id);if(s.outs<3&&s.bases[2]&&s.defense!=='in'&&!hadFirst&&random(s)<.55){scoreRun(s,s.bases[2]);s.bases[2]=null;addLog(s,b.name+'、内野ゴロの間に三塁走者が生還。','ground');}else addLog(s,b.name+'、内野ゴロ。走者は進めず。','out');}}else{s.outs++;s.lastPlay.outIds.push(b.id);tagUp(s);if(s.lastPlay.outcome==='sac')addLog(s,b.name+'、犠牲フライ！','sac');else addLog(s,b.name+'、フライアウト。','out');}if(s.score[s.half]>before)addLog(s,(s.score[s.half]-before)+'点が入りました。サンライズ '+s.score.home+' − '+s.score.away+' ブルーウェーブ。','score');}endPlay(s,true);completeReview(s);return {ok:true,events:s.log.slice(start),runs:s.lastPlay.runs,play:s.lastPlay};}
+  function step(s,action='contact') {if(s.done)return {ok:false};if(action==='intentional')return intentionalWalk(s);const offense=s.half==='home';const valid=offense?['contact','power','bunt','squeeze','steal']:['normal','strikeout','contact','low'];if(!valid.includes(action)||(action==='bunt'&&!canBunt(s))||(action==='squeeze'&&!canSqueeze(s))||(action==='steal'&&!stealInfo(s)))return {ok:false};const start=s.log.length,oldScore=s.score[s.half];let attack=offense?action:cpuAttackChoice(s);const defend=offense?(s.bases[0]&&s.outs<2?'low':'normal'):action;const p=currentPitcher(s),b=currentBatter(s),st=s.stats[s.half];const probs=matchupProbabilities(s,action);s.lastPlay={half:s.half,inning:s.inning,batter:{id:b.id,name:b.name},pitcher:{id:p.id,name:p.name},beforeBases:s.bases.map(p=>p?{id:p.id,name:p.name}:null),outsBefore:s.outs,scoreBefore:s.score[s.half],scored:[],outIds:[],outcome:'',direction:(s.plays%3)-1};const labels={contact:offense?'ミート重視':'打たせて取る',power:'長打狙い',bunt:'送りバント',squeeze:'スクイズ',steal:'盗塁',normal:'バランス',strikeout:'三振を狙う',low:'低めで勝負'};queueReview(s,labels[action]+'：'+(offense?b.name:p.name));s.decisions.push({half:halfName(s),text:labels[action]+'：'+(offense?b.name:p.name)});if(action==='squeeze'){
+      const third=s.bases[2], first=s.bases[0], second=s.bases[1];
+      if(!st.squeeze)st.squeeze={attempts:0,success:0,fail:0};
+      st.squeeze.attempts++;
+      p.pitches+=1+Math.floor(random(s)*2);
+      const success=random(s)<squeezeChance(s);
+      let completedPA=true;
+      if(success){
+        st.squeeze.success++;
+        s.lastPlay.outcome='squeeze';
+        s.lastPlay.outIds.push(b.id);
+        s.outs++;
+        s.bases=[null,first,second];
+        scoreRun(s,third);
+        addLog(s,b.name+'、スクイズ成功！'+third.name+'が生還。','squeeze');
+        addLog(s,'1点が入りました。サンライズ '+s.score.home+' − '+s.score.away+' ブルーウェーブ。','score');
+      }else{
+        st.squeeze.fail++;
+        const failure=random(s);
+        if(failure<.35){
+          s.lastPlay.outcome='squeezeHomeOut';
+          s.lastPlay.outIds.push(third.id);
+          s.outs++;
+          s.bases=[b,first,second];
+          addLog(s,third.name+'、スクイズで本塁を狙うもアウト。打者走者は一塁へ。','out');
+        }else if(failure<.7){
+          s.lastPlay.outcome='squeezeMiss';
+          s.lastPlay.outIds.push(third.id);
+          s.outs++;
+          s.bases[2]=null;
+          completedPA=false;
+          addLog(s,b.name+'がスクイズを空振り。'+third.name+'が本塁でアウト。打席は続く。','out');
+        }else if(failure<.85){
+          s.lastPlay.outcome='squeezeFoul';
+          s.lastPlay.outIds.push(b.id);
+          s.outs++;
+          addLog(s,b.name+'、2ストライクからスクイズがファウルとなり三振。走者は動けず。','out');
+        }else{
+          s.lastPlay.outcome='squeezeBuntOut';
+          s.lastPlay.outIds.push(b.id);
+          s.outs++;
+          addLog(s,b.name+'、スクイズ失敗。打者アウト、三塁走者は残塁。','out');
+        }
+      }
+      endPlay(s,completedPA);
+      completeReview(s);
+      return {ok:true,events:s.log.slice(start),runs:s.lastPlay.runs,play:s.lastPlay};
+    }if(action==='steal'){const info=stealInfo(s);p.pitches++;if(random(s)<info.chance){s.lastPlay.outcome='steal';s.bases[info.base+1]=info.runner;s.bases[info.base]=null;addLog(s,info.runner.name+'、'+(info.base===0?'二':'三')+'盗成功！','steal');}else{s.lastPlay.outcome='caught';s.lastPlay.outIds.push(info.runner.id);s.bases[info.base]=null;s.outs++;addLog(s,info.runner.name+'、盗塁失敗。アウト。','out');}endPlay(s,false);completeReview(s);return {ok:true,events:s.log.slice(start),play:s.lastPlay};}p.pitches+=3+Math.floor(random(s)*4)+(defend==='strikeout'?1:0);if(attack==='bunt'){const chance=buntChance(s);s.lastPlay.outIds.push(b.id);if(random(s)<chance){s.lastPlay.outcome='bunt';if(s.bases[1])s.bases[2]=s.bases[1];s.bases[1]=s.bases[0];s.bases[0]=null;s.outs++;addLog(s,b.name+'、送りバント成功。走者が進塁。','bunt');}else{s.lastPlay.outcome='buntOut';s.outs++;addLog(s,b.name+'、バント失敗。走者は進めず。','out');}}else{let roll=random(s),outcome='fly';for(const [key,v] of Object.entries(probs)){roll-=v;if(roll<0){outcome=key;break;}}s.lastPlay.outcome=outcome;if(['single','double','triple','error','fly'].includes(outcome))s.lastPlay.depth=clamp(random(s)*.85+b.power*.0015,0,1);const before=s.score[s.half];if(outcome==='bb'){walk(s,b);st.bb++;addLog(s,b.name+'、フォアボール。','walk');}else if(outcome==='hr'){const runs=1+s.bases.filter(Boolean).length;s.lastPlay.scored=s.bases.filter(Boolean).map(p=>p.id).concat(b.id);s.score[s.half]+=runs;s.lines[s.half][s.inning-1]+=runs;s.bases=[null,null,null];st.h++;st.hr++;addLog(s,b.name+'、'+(runs===1?'ソロ':runs===4?'満塁':runs+'ラン')+'ホームラン！','hr');}else if(['single','double','triple','error'].includes(outcome)){advanceHit(s,outcome==='double'?2:outcome==='triple'?3:1,b);if(outcome!=='error')st.h++;addLog(s,b.name+'、'+({single:'ヒット！',double:'二塁打！',triple:'三塁打！',error:'相手のエラーで出塁。'}[outcome]),outcome==='error'?'error':'hit');}else if(outcome==='k'){s.lastPlay.outIds.push(b.id);s.outs++;st.k++;addLog(s,b.name+'、空振り三振。','out');}else if(outcome==='ground'){const dpChance=clamp(.47-b.speed*.0025,.14,.43);if(s.bases[0]&&s.outs<2&&random(s)<dpChance){s.lastPlay.outcome='dp';s.lastPlay.outIds.push(s.bases[0].id,b.id);s.bases[0]=null;s.outs+=2;addLog(s,b.name+'、ゴロ併殺。ダブルプレー。','out');}else{const hadFirst=!!s.bases[0];s.outs++;s.lastPlay.outIds.push(b.id);if(s.outs<3&&s.bases[2]&&s.defense!=='in'&&!hadFirst&&random(s)<.55){scoreRun(s,s.bases[2]);s.bases[2]=null;addLog(s,b.name+'、内野ゴロの間に三塁走者が生還。','ground');}else addLog(s,b.name+'、内野ゴロ。走者は進めず。','out');}}else{s.outs++;s.lastPlay.outIds.push(b.id);tagUp(s);if(s.lastPlay.outcome==='sac')addLog(s,b.name+'、犠牲フライ！','sac');else addLog(s,b.name+'、フライアウト。','out');}if(s.score[s.half]>before)addLog(s,(s.score[s.half]-before)+'点が入りました。サンライズ '+s.score.home+' − '+s.score.away+' ブルーウェーブ。','score');}endPlay(s,true);completeReview(s);return {ok:true,events:s.log.slice(start),runs:s.lastPlay.runs,play:s.lastPlay};}
   function setDefense(s,value) {if(s.done||s.half!=='away'||!['normal','in'].includes(value))return false;s.defense=value;recordDecision(s,'守備位置：'+(value==='in'?'前進守備。内野ゴロでの本塁生還を防ぐ代わりに、安打が増えます。':'定位置に戻します。'));return true;}
-  return { VERSION,BALANCE_REVISION,opponentTypes,opponentType,opponentInfo,positions,positionAt,scenarios,createGame,createDailyGame,dailySpec,japanDate,buntChance,effectiveDefense,prepareTurn,step,replacePlayer,changePitcher,setDefense,batting,fielding,currentBatter,currentPitcher,fieldDefense,fatigue,stealInfo,canBunt,halfName,probabilities,matchupProbabilities };
+  return { VERSION,BALANCE_REVISION,opponentTypes,opponentType,opponentInfo,positions,positionAt,scenarios,createGame,createDailyGame,dailySpec,japanDate,buntChance,effectiveDefense,prepareTurn,step,replacePlayer,changePitcher,setDefense,batting,fielding,currentBatter,currentPitcher,fieldDefense,fatigue,stealInfo,canBunt,canSqueeze,squeezeChance,halfName,probabilities,matchupProbabilities };
 });

@@ -17,12 +17,17 @@
       for (const key of opponentKeys) opponents[key] = empty();
       byScenario[scenario] = { all: empty(), opponents };
     }
-    const output = { byScenario, overall: empty(), daily: empty(), previousRevision: 0, stored: rows.length };
+    const output = { byScenario, overall: empty(), daily: empty(), previousRevision: 0, stored: rows.length, squeeze: {attempts:0,success:0,fail:0} };
     for (const row of rows) {
       if (!row || !Object.prototype.hasOwnProperty.call(byScenario, row.scenario) || !results.includes(row.result)) continue;
       if (row.balanceRevision !== currentRevision || (row.daily && row.daily.balanceRevision !== currentRevision)) {
         output.previousRevision++;
         continue;
+      }
+      if (row.squeeze) {
+        for (const key of ['attempts','success','fail']) {
+          const v=row.squeeze[key];if(Number.isInteger(v)&&v>=0)output.squeeze[key]+=v;
+        }
       }
       if (row.daily) { add(output.daily, row.result); continue; }
       const opponent = row.opponent || 'balanced';

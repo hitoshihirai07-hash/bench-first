@@ -1,0 +1,21 @@
+name: Squeeze tests
+on:
+  push:
+    branches:
+      - qa/squeeze-20261026
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JS syntax and unit tests
+        run: |
+          node --check public/engine.js
+          node --check public/app.js
+          node --check public/motion.js
+          node --check public/scenario-stats.js
+          node --check tests/ui-smoke.mjs
+          node --test
