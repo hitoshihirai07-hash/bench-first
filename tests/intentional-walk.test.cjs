@@ -88,5 +88,5 @@ test('UI, record text, animation and cache revisions are wired',()=>{
   assert.match(read('app.js'),/\['intentional','申告敬遠'/);
   assert.match(read('app.js'),/intentional:'申告敬遠'/);
   assert.match(read('motion.js'),/play\.outcome==='intentional'/);
-  assert.match(read('index.html'),/engine\.js\?v=09/);
+  assert.match(read('index.html'),/engine\.js\?v=10/);
 });
