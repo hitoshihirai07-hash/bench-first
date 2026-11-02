@@ -40,5 +40,5 @@ test('UIが再挑戦と比較を読み込む', () => {
   assert.match(app,/function retrySameConditions\(/);
   assert.match(app,/function replayComparisonHTML\(/);
   assert.match(app,/scoreTable\(\)\+replayComparisonHTML\(\)/);
-  assert.match(html,/replay-compare\.js\?v=01/);
+  assert.match(html,/replay-compare\.js\?v=02/);
 });
