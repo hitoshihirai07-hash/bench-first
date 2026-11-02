@@ -1,0 +1,22 @@
+name: Custom scenario tests
+on:
+  push:
+    branches:
+      - main
+      - qa/custom-scenario-20261102
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JS syntax and all unit tests
+        run: |
+          node --check public/engine.js
+          node --check public/app.js
+          node --check public/custom-scenarios.js
+          node --check public/sharing.js
+          node --check public/replay-compare.js
+          node --test

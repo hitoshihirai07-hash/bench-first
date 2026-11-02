@@ -50,6 +50,7 @@
       away: game.score.away,
       result: game.result,
       scenario: game.scenario,
+      customKey: game.scenario === 'custom' ? JSON.stringify(game.customSpec) : null,
       opponent: game.opponent || 'balanced',
       dailyCode: game.daily?.code || null,
       balanceRevision: game.balanceRevision || null,
@@ -58,7 +59,7 @@
   }
   function comparable(previous, now) {
     return !!previous && !!now &&
-      previous.scenario === now.scenario && previous.opponent === now.opponent &&
+      previous.scenario === now.scenario && (previous.customKey||null) === (now.customKey||null) && previous.opponent === now.opponent &&
       previous.dailyCode === now.dailyCode &&
       previous.balanceRevision === now.balanceRevision;
   }

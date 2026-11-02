@@ -51,3 +51,18 @@
 .scenario-record{display:block;margin-top:5px;color:var(--orange);font-size:11px;font-weight:700}
 #game-stats{min-height:32px;padding:5px 9px;font-size:11px}
 @media(max-width:720px){.stats-row{padding:9px 10px}.stats-row strong{font-size:12px}.stats-list{max-height:42dvh}}
+
+/* 自由シナリオ作成 */
+.setup-custom{display:block;width:100%;margin:10px 0 12px;min-height:44px}
+.custom-form{display:grid;gap:13px;margin:12px 0 24px}
+.custom-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.custom-grid label,.custom-name{display:flex;flex-direction:column;gap:5px;font-weight:700;font-size:13px}
+.custom-form input:not([type=checkbox]),.custom-form select{min-width:0;width:100%;min-height:43px;border:1px solid #cbd5d1;background:#fff;color:var(--ink);border-radius:8px;padding:8px;font:inherit}
+.custom-bases{display:flex;flex-wrap:wrap;gap:14px;border:1px solid var(--line);border-radius:8px;padding:12px}
+.custom-bases legend{font-weight:700;font-size:13px}.custom-bases label{display:inline-flex;gap:5px;align-items:center}
+.custom-bases input{width:18px;height:18px;accent-color:var(--orange)}
+.custom-preview{padding:13px;background:var(--soft);border-radius:8px;font-weight:700;min-height:44px}
+.custom-saved{margin-top:22px}.custom-saved h3{font-size:17px;margin-bottom:10px}
+.custom-saved-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
+.custom-saved-row>div{flex:1 1 180px;min-width:0}.custom-saved-row strong{display:block;overflow-wrap:anywhere}.custom-saved-row small{display:block;color:var(--muted);margin-top:4px}
+@media(max-width:520px){.custom-grid{grid-template-columns:1fr}.custom-form .dialog-actions{display:grid;grid-template-columns:1fr}.custom-saved-row .small-button{flex:1}}

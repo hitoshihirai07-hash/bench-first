@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const G=window.BenchGame,S=window.BenchSharing,T=window.BenchStats,R=window.BenchReplay,$=id=>document.getElementById(id);
+  const G=window.BenchGame,S=window.BenchSharing,T=window.BenchStats,R=window.BenchReplay,C=window.BenchCustom,$=id=>document.getElementById(id);
   const GAME_KEY='bench-first-game-v1',HISTORY_KEY='bench-first-history-v1',PREF_KEY='bench-first-prefs-v2';
   let game,tab='tactics',selected='contact',busy=false,benchMode='pinch',benchTarget=7,storageOK=true,toastTimer,lineupTeam='home';
   let animationSpeed='normal',imageURL=null,imageJob=0;
@@ -24,11 +24,14 @@
   function read(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback;}catch{storageOK=false;return fallback;}}
   function save(){try{localStorage.setItem(GAME_KEY,JSON.stringify(game));}catch{storageOK=false;}$('save-status').textContent=storageOK?'この端末に自動保存':'この環境では保存できません（プレーは可能）';}
   function loadGame(){const s=read(GAME_KEY,null);try{
-    if(s&&[1,G.VERSION].includes(s.version)&&G.scenarios[s.scenario]&&(s.opponent===undefined||Object.prototype.hasOwnProperty.call(G.opponentTypes,s.opponent))&&(!s.daily||G.opponentType(s)==='balanced')&&s.inning>=7&&s.inning<=9&&['home','away'].includes(s.half)&&s.outs>=0&&s.outs<3&&s.bases.length===3&&Array.isArray(s.log)&&Array.isArray(s.decisions)&&Number.isFinite(s.rng)&&['home','away'].every(k=>Number.isFinite(s.score[k])&&s.lines[k].length===9&&s.teams[k].lineup.length===9&&s.teams[k].pitchers[s.teams[k].pitcherIndex]&&Array.isArray(s.teams[k].bench))){G.currentBatter(s);G.currentPitcher(s);s.version=G.VERSION;s.opponent=G.opponentType(s);hasSavedGame=true;return s;}
+    if(s&&[1,G.VERSION].includes(s.version)&&(G.scenarios[s.scenario]||(s.scenario==='custom'&&s.customSpec&&JSON.stringify(C.normalize(s.customSpec))===JSON.stringify(s.customSpec)))&&(s.opponent===undefined||Object.prototype.hasOwnProperty.call(G.opponentTypes,s.opponent))&&(!s.daily||G.opponentType(s)==='balanced')&&s.inning>=7&&s.inning<=9&&['home','away'].includes(s.half)&&s.outs>=0&&s.outs<3&&s.bases.length===3&&Array.isArray(s.log)&&Array.isArray(s.decisions)&&Number.isFinite(s.rng)&&['home','away'].every(k=>Number.isFinite(s.score[k])&&s.lines[k].length===9&&s.teams[k].lineup.length===9&&s.teams[k].pitchers[s.teams[k].pitcherIndex]&&Array.isArray(s.teams[k].bench))){G.currentBatter(s);G.currentPitcher(s);s.version=G.VERSION;s.opponent=G.opponentType(s);hasSavedGame=true;return s;}
     }catch{}return G.createGame();}
   function history(){const h=read(HISTORY_KEY,[]);return Array.isArray(h)?h.filter(x=>x&&['win','loss','draw'].includes(x.result)).slice(-100):[];}
-  function remember(){const h=history();if(h.some(x=>x.id===game.id))return;h.push({id:game.id,result:game.result,home:game.score.home,away:game.score.away,scenario:game.scenario,opponent:G.opponentType(game),date:new Date().toISOString(),daily:game.daily||null,squeeze:game.stats.home.squeeze||{attempts:0,success:0,fail:0},balanceRevision:game.balanceRevision||null});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-100)));}catch{storageOK=false;}}
+  function remember(){const h=history();if(h.some(x=>x.id===game.id))return;h.push({id:game.id,result:game.result,home:game.score.home,away:game.score.away,scenario:game.scenario,customSpec:game.customSpec||null,opponent:G.opponentType(game),date:new Date().toISOString(),daily:game.daily||null,squeeze:game.stats.home.squeeze||{attempts:0,success:0,fail:0},balanceRevision:game.balanceRevision||null});try{localStorage.setItem(HISTORY_KEY,JSON.stringify(h.slice(-100)));}catch{storageOK=false;}}
   function statsData(){return T.summarize(history(),G.scenarios,G.BALANCE_REVISION);}
+  function customStats(spec=null){const key=spec?JSON.stringify(spec):null;const rows=history().filter(x=>x.scenario==='custom'&&x.balanceRevision===G.BALANCE_REVISION&&(!key||JSON.stringify(x.customSpec)===key));return {win:rows.filter(x=>x.result==='win').length,loss:rows.filter(x=>x.result==='loss').length,draw:rows.filter(x=>x.result==='draw').length,total:rows.length};}
+  function sceneName(key){return key==='custom'?'自由シナリオ':G.scenarios[key].name;}
+
   function sceneStats(data,key,opponent){const item=data.byScenario[key];return opponent==='all'?item.all:item.opponents[opponent]||item.all;}
   function showStats(focus='',preferred='all'){
     if(busy)return;
@@ -38,6 +41,7 @@
       Object.entries(G.opponentTypes).map(([key,o])=>'<option value="'+key+'">'+esc(o.name)+'</option>').join('')+'</select>'+
       '<p id="stats-summary" class="record-totals" aria-live="polite"></p><p class="record-caption">スクイズ：'+data.squeeze.success+'回成功／'+data.squeeze.attempts+'回選択（失敗'+data.squeeze.fail+'回）</p><div id="stats-list" class="stats-list" aria-live="polite"></div>'+
       '<p class="record-caption">今日の共通のお題（現行版）：'+T.display(data.daily)+'／'+data.daily.total+'試合</p>'+
+      '<p class="record-caption">自由シナリオ（現行版）：'+T.display(customStats())+'／'+customStats().total+'試合</p>'+
       (data.previousRevision?'<p class="record-caption">以前のバランス版 '+data.previousRevision+'試合は、条件が異なるため集計から除外しています。</p>':'')+
       '<p class="record-caption">この端末内の記録です。別端末とは同期されず、ブラウザデータの削除で消えます。</p>'+
       '<div class="dialog-actions"><button id="stats-choose" class="primary">場面を選ぶ</button><button id="stats-close" class="small-button">閉じる</button></div>');
@@ -144,7 +148,7 @@
     document.querySelectorAll('[data-pitcher]').forEach(el=>el.onclick=()=>{const i=Number(el.dataset.pitcher);showConfirm('投手を交代しますか？',home.pitchers[i].name+'にマウンドを託します。交代した投手は再登板できません。',()=>{G.changePitcher(game,'home',i);save();render();toast('投手を交代しました。');},comparison(home.pitchers[home.pitcherIndex],home.pitchers[i],null,true));});
     $('back-tactics').onclick=()=>switchTab('tactics');
   }
-  function scoreTable(){return '<table class="line-score"><caption class="record-caption">イニング別スコア</caption><thead><tr><th>球団</th>'+Array.from({length:9},(_,i)=>'<th>'+ (i+1)+'</th>').join('')+'<th>計</th></tr></thead><tbody>'+['away','home'].map(k=>'<tr><th>'+(k==='home'?'サンライズ':'ウェーブ')+'</th>'+game.lines[k].map(v=>'<td>'+(v===null?'−':v)+'</td>').join('')+'<td class="total">'+game.score[k]+'</td></tr>').join('')+'</tbody></table>';}
+  function scoreTable(){return '<table class="line-score"><caption class="record-caption">' + (game.customSpec?'イニング別スコア（開始前の各回配分は仮設定）':'イニング別スコア') + '</caption><thead><tr><th>球団</th>'+Array.from({length:9},(_,i)=>'<th>'+ (i+1)+'</th>').join('')+'<th>計</th></tr></thead><tbody>'+['away','home'].map(k=>'<tr><th>'+(k==='home'?'サンライズ':'ウェーブ')+'</th>'+game.lines[k].map(v=>'<td>'+(v===null?'−':v)+'</td>').join('')+'<td class="total">'+game.score[k]+'</td></tr>').join('')+'</tbody></table>';}
   function logHTML(items){return items.map(l=>'<div class="log-row '+l.kind+'"><small>'+l.half+'</small><span>'+esc(l.text)+'</span></div>').join('');}
   function reviewBases(bases){return bases.some(Boolean)?bases.map((p,i)=>p?['一','二','三'][i]+'塁 '+p.name:'').filter(Boolean).join('・'):'走者なし';}
   function reviewCardHTML(card){
@@ -231,7 +235,7 @@
   function dialogHead(title){return '<div class="dialog-header"><h2 id="dialog-title">'+title+'</h2><button class="close-button" id="close-dialog" aria-label="閉じる">×</button></div>';}
   function showConfirm(title,text,fn,extra=''){const fromCommand=commandDialog.open;if(fromCommand)closeCommand();openDialog(dialogHead(title)+'<p class="dialog-text">'+esc(text)+'</p>'+extra+'<div class="dialog-actions"><button id="cancel" class="small-button">戻る</button><button id="confirm" class="primary">交代する</button></div>');$('cancel').onclick=()=>{$('dialog').close();if(fromCommand)openCommand('bench');};$('confirm').onclick=()=>{$('dialog').close();fn();};}
   function renderChallengeLabel(){
-    $('challenge-label').textContent=(game.daily?'共通のお題 '+game.daily.date+' · '+G.scenarios[game.scenario].name+(game.balanceRevision!==G.BALANCE_REVISION?' · 以前の保存位置':''):'自由に挑戦 · '+G.scenarios[game.scenario].name)+' · 相手：'+G.opponentInfo(game).name;
+    $('challenge-label').textContent=(game.daily?'共通のお題 '+game.daily.date+' · '+sceneName(game.scenario)+(game.balanceRevision!==G.BALANCE_REVISION?' · 以前の保存位置':''):'自由に挑戦 · '+sceneName(game.scenario))+' · 相手：'+G.opponentInfo(game).name;
     $('animation-speed').value=animationSpeed;
   }
   function difficultyHTML(sc){return '<span class="difficulty" aria-label="難易度5段階中'+sc.difficulty+'">難易度 '+'★'.repeat(sc.difficulty)+'☆'.repeat(5-sc.difficulty)+'</span>';}
@@ -251,15 +255,32 @@
   function showSetup(){
     if(busy)return;
     const sceneHistory=statsData();
-    openDialog(dialogHead('どの試合を指揮する？')+'<p class="dialog-text">あなたは後攻のサンライズ。選んだ場面から9回終了まで指揮します。'+(hasSavedGame&&!game.done?'開始すると進行中の試合は終了します。':'')+'</p><button id="setup-daily" class="daily-button setup-daily">今日の共通のお題で遊ぶ</button><p class="record-caption">共通のお題の相手はバランス型で統一しています。</p>'+opponentSelect('opponent-select',selectedOpponent)+'<div id="opponent-preview">'+opponentHTML(selectedOpponent)+'</div><button id="setup-stats" class="small-button">シナリオ別戦績を見る</button><div class="scenario-list">'+Object.entries(G.scenarios).map(([k,s])=>'<button class="scenario" data-scenario="'+k+'"><span><strong>'+s.name+'</strong><small>'+s.text+'</small>'+difficultyHTML(s)+'<small class="scenario-record" data-scene-record="'+k+'">戦績：'+T.display(sceneStats(sceneHistory,k,selectedOpponent))+'</small></span><span class="num">'+s.home+' − '+s.away+'</span></button>').join('')+'</div><p class="record-caption">左があなたのチーム。難易度は場面の目安です。自由に挑戦するモードでは結果は毎回変わります。</p>');
+    openDialog(dialogHead('どの試合を指揮する？')+'<p class="dialog-text">あなたは後攻のサンライズ。選んだ場面から9回終了まで指揮します。'+(hasSavedGame&&!game.done?'開始すると進行中の試合は終了します。':'')+'</p><button id="setup-daily" class="daily-button setup-daily">今日の共通のお題で遊ぶ</button><button id="setup-custom" class="small-button orange-outline setup-custom">自由シナリオを作る・保存した場面を選ぶ</button><p class="record-caption">共通のお題の相手はバランス型で統一しています。</p>'+opponentSelect('opponent-select',selectedOpponent)+'<div id="opponent-preview">'+opponentHTML(selectedOpponent)+'</div><button id="setup-stats" class="small-button">シナリオ別戦績を見る</button><div class="scenario-list">'+Object.entries(G.scenarios).map(([k,s])=>'<button class="scenario" data-scenario="'+k+'"><span><strong>'+s.name+'</strong><small>'+s.text+'</small>'+difficultyHTML(s)+'<small class="scenario-record" data-scene-record="'+k+'">戦績：'+T.display(sceneStats(sceneHistory,k,selectedOpponent))+'</small></span><span class="num">'+s.home+' − '+s.away+'</span></button>').join('')+'</div><p class="record-caption">左があなたのチーム。難易度は場面の目安です。自由に挑戦するモードでは結果は毎回変わります。</p>');
     $('opponent-select').onchange=()=>{selectedOpponent=$('opponent-select').value;$('opponent-preview').innerHTML=opponentHTML(selectedOpponent);document.querySelectorAll('[data-scene-record]').forEach(el=>{el.textContent='戦績：'+T.display(sceneStats(sceneHistory,el.dataset.sceneRecord,selectedOpponent));});};
-    document.querySelectorAll('[data-scenario]').forEach(el=>el.onclick=()=>showScenario(el.dataset.scenario));$('setup-daily').onclick=showDaily;$('setup-stats').onclick=()=>showStats('',selectedOpponent);
+    document.querySelectorAll('[data-scenario]').forEach(el=>el.onclick=()=>showScenario(el.dataset.scenario));$('setup-daily').onclick=showDaily;$('setup-custom').onclick=()=>showCustomEditor();$('setup-stats').onclick=()=>showStats('',selectedOpponent);
   }
-  function newGame(scenario,dailyDate=null,opponent=selectedOpponent,retry=null){
+  function showCustomEditor(initial=C.defaultSpec,name=''){
+    if(busy)return;
+    let spec;try{spec=C.normalize(initial);}catch{spec=C.normalize(C.defaultSpec);}
+    const saved=C.saved();
+    openDialog(dialogHead('自由シナリオを作る')+'<p class="dialog-text">試合の開始状況を決めて、9回終了まで采配します。保存はこの端末内です。'+(hasSavedGame&&!game.done?'新しく開始すると進行中の試合を置き換えます。':'')+'</p>'+C.formHTML(spec,name)+
+      '<div class="custom-saved"><h3>保存した場面（'+saved.length+'/'+C.MAX_SAVED+'）</h3>'+
+      (saved.length?saved.map(row=>'<div class="custom-saved-row"><div><strong>'+esc(row.name)+'</strong><small>'+esc(C.describe(row.spec))+'</small></div><button class="small-button" data-custom-open="'+esc(row.id)+'">編集・挑戦</button><button class="small-button" data-custom-delete="'+esc(row.id)+'">削除</button></div>').join(''):'<p class="record-caption">保存した場面はまだありません。</p>')+'</div>');
+    const form=$('custom-form'),error=$('custom-error'),preview=$('custom-preview');
+    function current(){return C.formValue(form);}
+    function validate(){try{const data=current();preview.textContent='開始：'+C.describe(data);error.textContent='';$('custom-start').disabled=false;$('custom-save').disabled=false;return data;}catch(e){error.textContent=e.message;preview.textContent='設定を確認してください。';$('custom-start').disabled=true;$('custom-save').disabled=true;return null;}}
+    form.addEventListener('input',validate);form.addEventListener('change',validate);
+    form.addEventListener('submit',e=>e.preventDefault());validate();
+    $('custom-start').onclick=()=>{const data=validate();if(data)newGame('custom',null,data.opponent,null,data);};
+    $('custom-save').onclick=()=>{const data=validate();if(!data)return;try{const row=C.store(form.elements.namedItem('name').value,data);showCustomEditor(data,row.name);}catch{error.textContent='保存できませんでした。端末の空き容量やブラウザの保存設定を確認してください。';}};
+    document.querySelectorAll('[data-custom-open]').forEach(button=>button.onclick=()=>{const item=C.saved().find(x=>x.id===button.dataset.customOpen);if(item)showCustomEditor(item.spec,item.name);});
+    document.querySelectorAll('[data-custom-delete]').forEach(button=>button.onclick=()=>{const item=C.saved().find(x=>x.id===button.dataset.customDelete);if(!item)return;if(!window.confirm('「'+item.name+'」を削除しますか？'))return;try{C.remove(item.id);showCustomEditor(current(),form.elements.namedItem('name').value);}catch{error.textContent='削除できませんでした。';}});
+  }
+  function newGame(scenario,dailyDate=null,opponent=selectedOpponent,retry=null,customSpec=null){
     clearEntry();
     const attempt=String(Date.now())+'-'+Math.floor(Math.random()*100000);
     const seed=retry&&Number.isSafeInteger(retry.seed)?retry.seed:Date.now()+Math.floor(Math.random()*100000);
-    game=dailyDate?G.createDailyGame(dailyDate,attempt):G.createGame(scenario,seed,{opponent});
+    game=dailyDate?G.createDailyGame(dailyDate,attempt):G.createGame(scenario,seed,{opponent,custom:customSpec});
     if (!dailyDate) game.replaySeed=seed;
     if (retry?.previous) {
       game.replayPrevious=retry.previous;
@@ -289,7 +310,7 @@
     try{
       const output=await S.card(snapshot,G);if(job!==imageJob||!$('dialog').open)return;
       imageURL=URL.createObjectURL(output.blob);
-      $('image-content').innerHTML='<img id="result-image" class="result-image" alt="'+esc(G.scenarios[snapshot.scenario].name)+'の結果。サンライズ '+snapshot.score.home+'対ブルーウェーブ '+snapshot.score.away+'、相手タイプ '+esc(G.opponentInfo(snapshot).name)+'"><a id="download-image" class="primary image-download">PNG画像を保存</a><p class="record-caption">保存が始まらない端末では、画像を長押しして保存できます。SNSには下の結果文・リンクも添えてください。</p><div class="image-actions"><button id="image-copy" class="small-button">結果文とリンクをコピー</button><button id="image-back" class="small-button">結果に戻る</button></div>';
+      $('image-content').innerHTML='<img id="result-image" class="result-image" alt="'+esc(sceneName(snapshot.scenario))+'の結果。サンライズ '+snapshot.score.home+'対ブルーウェーブ '+snapshot.score.away+'、相手タイプ '+esc(G.opponentInfo(snapshot).name)+'"><a id="download-image" class="primary image-download">PNG画像を保存</a><p class="record-caption">保存が始まらない端末では、画像を長押しして保存できます。SNSには下の結果文・リンクも添えてください。</p><div class="image-actions"><button id="image-copy" class="small-button">結果文とリンクをコピー</button><button id="image-back" class="small-button">結果に戻る</button></div>';
       $('result-image').src=imageURL;$('download-image').href=imageURL;$('download-image').download=output.name;
       $('image-copy').onclick=()=>copyText(S.text(S.resultData(snapshot,G)));$('image-back').onclick=showResult;
     }catch{if(job!==imageJob||!$('dialog').open)return;$('image-content').innerHTML='<p class="dialog-text">画像を作成できませんでした。結果のコピーをご利用ください。</p><button id="image-back" class="primary">結果に戻る</button>';$('image-back').onclick=showResult;}
@@ -316,15 +337,15 @@
     const seed=R.seed(game);
     if (!game.daily && seed===null) return;
     const previous=R.snapshot(game);
-    newGame(game.scenario,game.daily?.date||null,G.opponentType(game),{seed,previous});
+    newGame(game.scenario,game.daily?.date||null,G.opponentType(game),{seed,previous},game.customSpec||null);
   }
   function showResult(){
     if(!game.done)return;const h=history(),count=r=>h.filter(x=>x.result===r).length;
-    const sceneHistory=statsData(),sceneResult=game.daily?sceneHistory.daily:sceneStats(sceneHistory,game.scenario,G.opponentType(game));
+    const sceneHistory=statsData(),sceneResult=game.daily?sceneHistory.daily:game.scenario==='custom'?customStats(game.customSpec):sceneStats(sceneHistory,game.scenario,G.opponentType(game));
     const canRetrySame=game.balanceRevision===G.BALANCE_REVISION&&(!!game.daily||R.seed(game)!==null);
     openDialog(dialogHead({win:'サンライズ、勝利！',loss:'あと一歩、届かず。',draw:'9回終了、引き分け。'}[game.result])+(game.daily?'<p class="challenge-date">共通のお題 '+game.daily.code+'</p>':'')+'<div class="result-score">'+game.score.home+' − '+game.score.away+'<small>サンライズ 対 ブルーウェーブ · '+G.opponentInfo(game).name+'</small></div><p class="dialog-text">'+resultTitle()+'</p>'+replayComparisonHTML()+reviewHTML(3)+'<p class="record-caption">結果だけで采配の良し悪しは決まりません。選手の特徴や残り戦力も振り返ってみましょう。</p><div class="record-totals">この端末の戦績：'+count('win')+'勝 '+count('loss')+'敗 '+count('draw')+'分（直近'+h.length+'試合）</div><p class="record-caption">この場面の戦績（現行版）：'+T.display(sceneResult)+'／'+sceneResult.total+'試合</p><div class="result-buttons">'+(canRetrySame?'<button id="retry-same" class="primary">同条件で再挑戦</button>':'')+'<button id="replay" class="small-button">'+(game.daily?'このお題をもう一度':'新しい展開でもう一度')+'</button><button id="share" class="small-button">結果をコピー</button>'+(S.canNative(navigator,S.resultData(game,G))?'<button id="native-share" class="small-button">結果をシェア</button>':'')+'<button id="result-png" class="small-button">結果画像を保存</button><button id="result-record" class="small-button">試合記録を見る</button><button id="result-stats" class="small-button">シナリオ別戦績</button></div><p class="record-caption">'+(canRetrySame?'同条件で再挑戦では、開始状態と抽選の並びが同じです。同じ采配なら同じ結果を再現できます。':'以前のバランス版・一部の旧保存試合は同条件再挑戦に対応していません。')+'</p>');
     if(canRetrySame)$('retry-same').onclick=retrySameConditions;
-    $('replay').onclick=()=>newGame(game.scenario,game.daily?.date||null,G.opponentType(game));$('result-stats').onclick=()=>showStats(game.scenario,G.opponentType(game));$('result-record').onclick=()=>{$('dialog').close();openRecord();};$('share').onclick=()=>copyText(shareText());if($('native-share'))$('native-share').onclick=()=>nativeShare(S.resultData(game,G),$('native-share'));$('result-png').onclick=showImage;
+    $('replay').onclick=()=>newGame(game.scenario,game.daily?.date||null,G.opponentType(game),null,game.customSpec||null);$('result-stats').onclick=()=>showStats(game.scenario,G.opponentType(game));$('result-record').onclick=()=>{$('dialog').close();openRecord();};$('share').onclick=()=>copyText(shareText());if($('native-share'))$('native-share').onclick=()=>nativeShare(S.resultData(game,G),$('native-share'));$('result-png').onclick=showImage;
   }
   function toast(text){clearTimeout(toastTimer);$('toast').textContent=text;$('toast').className='visible';toastTimer=setTimeout(()=>$('toast').className='',2600);}
   $('help').onclick=()=>{if(!busy)showHelp();};$('restart').onclick=showSetup;$('daily').onclick=showDaily;$('share-links').onclick=showLinks;$('dialog').addEventListener('close',()=>{if(!$('dialog').open)clearImage();});
@@ -332,7 +353,7 @@
   $('animation-speed').onchange=e=>{animationSpeed=e.target.value;try{localStorage.setItem(PREF_KEY,JSON.stringify({speed:animationSpeed}));}catch{storageOK=false;}save();};
   document.querySelectorAll('[data-tab]').forEach(el=>{el.onclick=()=>switchTab(el.dataset.tab);el.onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const tabs=['tactics','bench','lineup','record'];let i=tabs.indexOf(tab);i=e.key==='Home'?0:e.key==='End'?3:(i+(e.key==='ArrowRight'?1:3))%4;switchTab(tabs[i]);$('tab-'+tabs[i]).focus();};});
   game=loadGame();lineupTeam=game.half;selectedOpponent=G.opponentType(game);
-  $('choose-scenario').onclick=showSetup;$('start-today').onclick=showDaily;$('start-stats').onclick=()=>showStats();$('game-stats').onclick=()=>showStats(game.scenario,G.opponentType(game));
+  $('choose-scenario').onclick=showSetup;$('start-custom').onclick=()=>showCustomEditor();$('start-today').onclick=showDaily;$('start-stats').onclick=()=>showStats();$('game-stats').onclick=()=>showStats(game.scenario,G.opponentType(game));
   $('saved-version-note').hidden=!hasSavedGame||game.balanceRevision===G.BALANCE_REVISION;
   $('resume-game').hidden=!hasSavedGame;$('resume-game').textContent=game.done?'保存した試合の記録を見る':'続きから遊ぶ';
   $('resume-game').onclick=()=>{selected=game.half==='home'?'contact':'normal';activateGame();if(game.done){remember();openRecord();}};

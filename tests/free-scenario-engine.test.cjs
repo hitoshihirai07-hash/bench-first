@@ -1,0 +1,16 @@
+'use strict';
+const assert=require('node:assert/strict');
+const G=require('../public/engine.js'),C=require('../public/custom-scenarios.js'),R=require('../public/replay-compare.js');
+const spec=C.normalize({inning:8,half:'away',outs:1,home:3,away:5,bases:[true,true,false],order:4,pitches:125,opponent:'defense'});
+const s=G.createGame('custom',12345,{opponent:spec.opponent,custom:spec});
+assert.deepEqual(s.customSpec,spec);
+assert.equal(s.inning,8);assert.equal(s.teams.away.order,4);assert.equal(G.currentPitcher(s).pitches,125);
+assert.notEqual(s.bases[0].id,s.bases[1].id);
+assert.equal(s.lines.home.reduce((a,n)=>a+(Number.isInteger(n)?n:0),0),3);
+assert.equal(s.lines.away.reduce((a,n)=>a+(Number.isInteger(n)?n:0),0),5);
+assert.equal(s.lines.home[7],null);assert.equal(s.lines.away[7],0);
+assert.equal(G.step(s,'normal').ok,true);
+const same=G.createGame('custom',12345,{opponent:spec.opponent,custom:spec});
+const different=G.createGame('custom',12345,{opponent:spec.opponent,custom:{...spec,home:2}});
+assert.equal(R.comparable(R.snapshot(s),R.snapshot(same)),true);
+assert.equal(R.comparable(R.snapshot(s),R.snapshot(different)),false);

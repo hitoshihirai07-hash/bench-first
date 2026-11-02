@@ -1,0 +1,15 @@
+'use strict';
+const assert = require('node:assert/strict');
+const C = require('../public/custom-scenarios.js');
+const data = new Map();
+global.localStorage = { getItem:key=>data.has(key)?data.get(key):null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key) };
+const valid = C.normalize(C.defaultSpec);
+assert.deepEqual(valid,C.defaultSpec);
+assert.equal(C.describe(valid).includes('9回裏・2死・満塁'),true);
+for(const bad of [{home:5,away:4},{inning:6},{outs:3},{order:9},{home:-1},{bases:[1,false,false]},{opponent:'unknown'}])assert.throws(()=>C.normalize({...valid,...bad}));
+const item=C.store('テスト <script>',valid);
+assert.equal(C.saved()[0].id,item.id);
+assert.equal(C.formHTML(valid,item.name).includes('<script>'),false);
+C.remove(item.id);assert.equal(C.saved().length,0);
+for(let i=0;i<20;i++)C.store('保存'+i,valid);
+assert.equal(C.saved().length,C.MAX_SAVED);

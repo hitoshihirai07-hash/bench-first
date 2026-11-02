@@ -99,8 +99,18 @@
   function createGame(scenario='chase',seed=Date.now(),options={}) {
     const opponent=options.opponent===undefined?'balanced':options.opponent;
     if(typeof opponent!=='string'||!Object.prototype.hasOwnProperty.call(opponentTypes,opponent))throw new Error('Invalid opponent');
-    if (!scenarios[scenario]) scenario='chase';
-    const sc=scenarios[scenario];
+    // 自由作成は既存の固定シナリオとは独立した開始状態にする。
+    const custom=scenario==='custom'?options.custom:null;
+    if(scenario==='custom'){
+      if(!custom||![7,8,9].includes(custom.inning)||!['home','away'].includes(custom.half)||
+        !Number.isInteger(custom.outs)||custom.outs<0||custom.outs>2||
+        !Number.isInteger(custom.home)||!Number.isInteger(custom.away)||custom.home<0||custom.away<0||custom.home>20||custom.away>20||
+        !Array.isArray(custom.bases)||custom.bases.length!==3||custom.bases.some(v=>typeof v!=='boolean')||
+        !Number.isInteger(custom.order)||custom.order<0||custom.order>8||
+        !Number.isInteger(custom.pitches)||custom.pitches<0||custom.pitches>150||
+        custom.opponent!==opponent||(custom.inning===9&&custom.half==='home'&&custom.home>custom.away))throw new Error('Invalid custom scenario');
+    }else if(!scenarios[scenario])scenario='chase';
+    const sc=custom||scenarios[scenario];
     const s={ version:VERSION,balanceRevision:BALANCE_REVISION,opponent,id:String(seed)+'-'+scenario+(opponent==='balanced'?'':'-'+opponent),rng:(seed>>>0)||12345,scenario,inning:sc.inning||7,half:sc.half||'home',outs:sc.outs===undefined?1:sc.outs,
       score:{home:sc.home,away:sc.away}, lines:{home:[0,1,0,0,sc.home-1,0,0,null,null],away:[1,0,0,1,0,sc.away-2,0,null,null]},
       teams:{home:makeTeam(true),away:makeTeam(false,opponent)},bases:[null,null,null],log:[],decisions:[],done:false,result:null,plays:0,
@@ -108,9 +118,21 @@
       stats:{home:{h:0,bb:0,k:0,hr:0},away:{h:0,bb:0,k:0,hr:0}}, defense:'normal' };
     for(const side of ['home','away'])for(let i=6;i<9;i++)s.lines[side][i]=(i<s.inning-1||(i===s.inning-1&&(side==='away'||s.half==='home')))?0:null;
     const t=batting(s);if(sc.order!==undefined)t.order=sc.order;
-    s.bases=(sc.bases||[6,null,null]).map(i=>i===null?null:t.lineup[i]);
-    if(sc.pitches!==undefined)currentPitcher(s).pitches=sc.pitches;
-    addLog(s,sc.text,'start');
+    s.bases=custom?custom.bases.map((on,i)=>on?t.lineup[(custom.order+8-i)%9]:null):(sc.bases||[6,null,null]).map(i=>i===null?null:t.lineup[i]);
+    if(custom){
+      t.order=custom.order;
+      // 過去の得点は仮配分するが、合計点と実施済みの回を一致させる。
+      for(const side of ['home','away']){
+        const lines=Array(9).fill(null),previous=s.inning-1;
+        for(let i=0;i<previous;i++)lines[i]=0;
+        for(let i=0;i<s.score[side];i++)lines[i%previous]++;
+        if(side==='away'||s.half==='home')lines[s.inning-1]=0;
+        s.lines[side]=lines;
+      }
+      currentPitcher(s).pitches=custom.pitches;
+      s.customSpec={...custom,bases:[...custom.bases]};
+    }else if(sc.pitches!==undefined)currentPitcher(s).pitches=sc.pitches;
+    addLog(s,custom?'自分で作った試合状況から開始します。':sc.text,'start');
     addLog(s,currentBatter(s).name+'の打席から、あなたが指揮を執ります。','start');
     prepareTurn(s);
     return s;

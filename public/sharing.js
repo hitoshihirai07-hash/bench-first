@@ -15,8 +15,8 @@
     if(q.has('scenario')&&Object.prototype.hasOwnProperty.call(G.scenarios,scene))return {kind:'scenario',scenario:scene,opponent};
     return {error:'指定された場面が見つかりません。「はじめから」で場面を選べます。'};
   }
-  function resultLink(game){return game.daily?link('daily',game.daily.date):link('scenario',game.scenario,game.opponent||'balanced');}
-  function resultData(game,G){return {title:'ベンチからの一手',text:(game.daily?'共通のお題 '+game.daily.date+'｜'+game.daily.code:'自由に挑戦')+'\n'+G.scenarios[game.scenario].name+'\nサンライズ '+game.score.home+' − '+game.score.away+' ブルーウェーブ（'+G.opponentInfo(game).name+'）\n'+({win:'勝利！',loss:'敗戦。',draw:'引き分け。'}[game.result])+' あなたならどう采配する？\n#ベンチからの一手 #プロ野球観戦メモ',url:resultLink(game)};}
+  function resultLink(game){return game.scenario==='custom'?SITE:game.daily?link('daily',game.daily.date):link('scenario',game.scenario,game.opponent||'balanced');}
+  function resultData(game,G){const custom=game.scenario==='custom',s=game.customSpec;const name=custom?'自由シナリオ':G.scenarios[game.scenario].name;const note=custom&&s?'\n開始：'+s.inning+'回'+(s.half==='home'?'裏':'表')+'・'+s.outs+'死・サンライズ '+s.home+'−'+s.away+' ブルーウェーブ\n※自作場面そのものの共有リンクは未対応です。':'';return {title:'ベンチからの一手',text:(game.daily?'共通のお題 '+game.daily.date+'｜'+game.daily.code:'自由に挑戦')+'\n'+name+note+'\nサンライズ '+game.score.home+' − '+game.score.away+' ブルーウェーブ（'+G.opponentInfo(game).name+'）\n'+({win:'勝利！',loss:'敗戦。',draw:'引き分け。'}[game.result])+' あなたならどう采配する？\n#ベンチからの一手 #プロ野球観戦メモ',url:resultLink(game)};}
   function text(data){return data.text+'\n'+data.url;}
   function canNative(nav,data){try{return typeof nav.share==='function'&&(!nav.canShare||nav.canShare(data));}catch{return false;}}
   async function share(nav,data){if(!canNative(nav,data))return 'fallback';try{await nav.share(data);return 'opened';}catch(e){return e.name==='AbortError'?'cancelled':'fallback';}}
@@ -33,8 +33,8 @@
     label('ベンチからの一手',76,106,40);label('プロ野球観戦メモ',820,104,23,muted);
     rect(76,140,1048,2,'#e0e8e3');
     label(game.daily?'共通のお題 '+game.daily.date+'  /  '+game.daily.code:'自由に挑戦  /  終盤の采配',76,192,24,muted,400);
-    label(G.scenarios[game.scenario].name,76,259,42);
-    wrap(G.scenarios[game.scenario].text,76,305,1048,23,muted,1);
+    label(game.scenario==='custom'?'自由シナリオ':G.scenarios[game.scenario].name,76,259,42);
+    wrap(game.scenario==='custom'?'自分で作成した場面からの采配':G.scenarios[game.scenario].text,76,305,1048,23,muted,1);
     rect(76,348,1048,220,'#fff5ed');
     label('サンライズ',112,414,30);label('ブルーウェーブ',770,414,30);
     label('あなたのチーム',112,459,20,muted,400);label('CPU / '+G.opponentInfo(game).name,770,459,20,muted,400);
@@ -42,7 +42,7 @@
     const last=game.log.filter(l=>['score','hr'].includes(l.kind)).slice(-1)[0]||game.log.filter(l=>l.kind==='decision').slice(-1)[0];
     label('試合のひとこま',76,625,23,orange);wrap(last?last.half+' '+last.text:'最後まで戦い抜いた、あなたの采配。',76,668,1048,25,ink,2);
     rect(76,744,1048,2,'#e0e8e3');label('あなたなら、どう采配する？',76,795,30);label('bench-first.pages.dev',76,832,22,muted,400);
-    label(game.daily?'同じお題へのリンクを本文に添えて共有':'同じ場面へのリンクを本文に添えて共有',605,825,20,muted,400,510);
+    label(game.scenario==='custom'?'自作場面の共有リンクは未対応':game.daily?'同じお題へのリンクを本文に添えて共有':'同じ場面へのリンクを本文に添えて共有',605,825,20,muted,400,510);
     const blob=await new Promise((resolve,reject)=>c.toBlob(b=>b?resolve(b):reject(new Error('画像を作成できません。')),'image/png'));
     return {blob,name:'bench-first-'+(game.daily?game.daily.code:game.scenario+'-'+G.opponentType(game))+'-'+game.score.home+'-'+game.score.away+'.png'};
   }
