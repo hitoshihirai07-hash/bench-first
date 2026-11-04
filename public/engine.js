@@ -6,11 +6,11 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const VERSION = 2;
-  const BALANCE_REVISION = '05';
+  const BALANCE_REVISION = '06';
   const opponentTypes = {
-    balanced:{name:'バランス型',strength:'打線・守備・投手に極端な偏りがない。',weakness:'突出した強みはなく、選手ごとの特徴で勝負。',tip:'極端な癖はない。状況を見て代打・継投を判断する。'},
-    power:{name:'長打型',strength:'主軸だけでなく打線全体に一発がある。',weakness:'守備・走力・投手の能力は控えめ。',tip:'強攻策を好み、長打力のある代打を早めに投入。投手はやや長く引っ張る。'},
-    defense:{name:'守備・継投型',strength:'堅い守備と、球威・制球の高い救援陣。',weakness:'長打とミートは控えめ。',tip:'早めの継投と守備固めを使い、リード時は守備力を優先する。'}
+    balanced:{name:'バランス型',strength:'打撃・守備・投手の偏りが少なく、状況に応じて戦う。',weakness:'突出した強みはないため、打者・投手の相性が重要。',tip:'選手の能力と試合状況を見て、強攻・代打・継投を使い分ける。'},
+    power:{name:'長打型',strength:'主軸と代打に長打力があり、好機では強攻を選びやすい。',weakness:'守備範囲・走力・投手の制球が弱く、接戦の守りが課題。',tip:'走者をためて一発を狙う。終盤は強打者の代打を積極的に使うが、先発を長めに起用する。'},
+    defense:{name:'守備・継投型',strength:'捕手・二遊間の守備と、救援陣の球威・制球が強み。',weakness:'長打力が控えめで大量点には向かない。',tip:'接戦の終盤では守備固めや早めの継投を優先し、強攻は追う展開に絞る。'}
   };
   function opponentType(value='balanced') {
     const key=typeof value==='string'?value:value?.opponent||'balanced';
@@ -77,13 +77,20 @@
       ], pitcherIndex: 0, usedPitchers: [0]
     };
     if(!home&&opponent!=='balanced'){
-      for(const player of all){
-        const changes=opponent==='power'?{power:10,defense:-10,speed:-6}:{power:-9,contact:-3,defense:9};
+      for(const [index,player] of all.entries()){
+        // 能力の偏りと控え選手の役割を実戦に反映する。プレイヤーチームは変更しない。
+        const changes=opponent==='power'?{power:10,contact:-2,defense:-10,speed:-6}:{power:-9,contact:-3,defense:9,eye:3};
         for(const [key,delta] of Object.entries(changes))player[key]=clamp(player[key]+delta,0,100);
+        if(opponent==='power'&&[2,3,4,9].includes(index))player.power=clamp(player.power+6,0,100);
+        if(opponent==='defense'&&[1,7,8,11].includes(index))player.defense=clamp(player.defense+4,0,100);
       }
       for(const [index,p] of team.pitchers.entries()){
-        if(opponent==='power'){p.stuff=clamp(p.stuff-5,0,100);p.control=clamp(p.control-5,0,100);}
-        else if(index>0){p.stuff=clamp(p.stuff+5,0,100);p.control=clamp(p.control+7,0,100);}
+        if(opponent==='power'){
+          p.stuff=clamp(p.stuff-5,0,100);p.control=clamp(p.control-6,0,100);
+          if(index===0)p.stamina+=12; // 先発を長めに使う代わりに救援の弱さを抱える
+        }else if(index>0){
+          p.stuff=clamp(p.stuff+6,0,100);p.control=clamp(p.control+8,0,100);
+        }
       }
     }
     return team;
@@ -220,8 +227,15 @@
   }
   function cpuAttackChoice(s) {
     const b=currentBatter(s),gap=s.score.away-s.score.home,type=opponentType(s);
-    if(type==='power')return b.power>=60||(s.inning>=8&&gap<=0&&b.power>=52)?'power':'contact';
-    if(type==='defense')return gap<=-2&&b.power>=80?'power':'contact';
+    if(type==='power'){
+      // 強打者は積極的に振り、走者を置いた好機や終盤のビハインドでは強攻の範囲を広げる。
+      const chance=s.bases.some(Boolean),trailing=gap<0;
+      return b.power>=(chance?57:65)||(s.inning>=8&&trailing&&b.power>=53)?'power':'contact';
+    }
+    if(type==='defense'){
+      // 守備型は出塁を優先するが、終盤に複数点を追うときは長打を狙う。
+      return s.inning>=8&&gap<=-2&&b.power>=74?'power':'contact';
+    }
     return b.power>=75&&gap<=0?'power':'contact';
   }
   function matchupProbabilities(s,action) {
@@ -245,8 +259,10 @@
   function replacePlayer(s,index,id,mode='pinch') {if(s.done)return false;const t=s.teams.home;if(!Number.isInteger(index)||index<0||index>8)return false;if(mode==='pinch'&&(s.half!=='home'||index!==t.order))return false;if(mode==='defense'&&s.half!=='away')return false;const bi=t.bench.findIndex(p=>p.id===id);if(bi<0)return false;const old=t.lineup[index],incoming=t.bench[bi];if(mode==='runner'&&(s.half!=='home'||!s.bases.some(p=>p&&p.id===old.id)))return false;if(mode==='pinch')queueReview(s,'代打：'+old.name+' → '+incoming.name);t.lineup[index]=incoming;t.bench.splice(bi,1);t.removed.push(old);s.bases=s.bases.map(p=>p&&p.id===old.id?incoming:p);const label=mode==='runner'?'代走':mode==='defense'?'守備交代':'代打';recordDecision(s,label+'：'+old.name+' → '+incoming.name+'。'+(positions[index]!=='指'&&!incoming.pos.includes(positions[index])?'守備適性外のため守備力が低下。':'交代した選手は再出場できません。'));return true;}
   function changePitcher(s,team,index) {if(s.done||!['home','away'].includes(team))return false;const t=s.teams[team];if(t.usedPitchers.includes(index)||!t.pitchers[index])return false;if(team==='home')queueReview(s,'継投：'+t.pitchers[t.pitcherIndex].name+' → '+t.pitchers[index].name);t.pitcherIndex=index;t.usedPitchers.push(index);recordDecision(s,(team==='home'?'継投':'相手の継投')+'：'+t.pitchers[index].name+'。'+t.pitchers[index].trait+'。');return true;}
   function defensivePlan(t,protect=false) {const dh=t.lineup.findIndex((_,i)=>positionAt(t,i)==='指');const players=t.lineup.filter((_,i)=>i!==dh).concat(t.bench),active=new Set(t.lineup.map(p=>p.id));const slots=positions.filter(pos=>pos!=='指').sort((a,b)=>players.filter(p=>p.pos.includes(a)).length-players.filter(p=>p.pos.includes(b)).length);const memo=new Map();function assign(i,mask){if(i===8)return {value:0,picks:[]};const key=i+':'+mask;if(memo.has(key))return memo.get(key);let best=null;for(let j=0;j<players.length;j++){const p=players[j];if((mask&(1<<j))||!p.pos.includes(slots[i]))continue;const rest=assign(i+1,mask|(1<<j));if(!rest)continue;const existing=t.lineup.findIndex(x=>x.id===p.id);const value=rest.value+p.defense+(active.has(p.id)?(protect?28:10000):0)+(existing>=0&&positionAt(t,existing)===slots[i]?3:0);if(!best||value>best.value)best={value,picks:[{p,pos:slots[i]},...rest.picks]};}memo.set(key,best);return best;}const plan=assign(0,0);if(plan)plan.dh=dh;return plan;}
-  function cpuDefense(s) {const t=s.teams.away,type=opponentType(s),lead=s.score.away-s.score.home;const protect=type==='defense'?(s.inning>=7&&lead>0):type==='power'?(s.inning>=9&&lead>0):(s.inning>=8&&lead>0);const plan=defensivePlan(t,protect);if(!plan)return;const chosen=new Set(plan.picks.map(x=>x.p.id));chosen.add(t.lineup[plan.dh].id);const incoming=plan.picks.filter(x=>!t.lineup.some(p=>p.id===x.p.id)).map(x=>x.p);const next=t.lineup.slice();for(let i=0;i<9;i++)if(!chosen.has(next[i].id)){const old=next[i],p=incoming.shift();next[i]=p;t.removed.push(old);t.bench=t.bench.filter(b=>b.id!==p.id);addLog(s,'相手の守備交代：'+old.name+' → '+p.name+'。','decision');}const fieldPositions=next.map((p,i)=>i===plan.dh?'指':plan.picks.find(x=>x.p.id===p.id).pos);for(let i=0;i<9;i++)if(t.lineup[i].id===next[i].id&&positionAt(t,i)!==fieldPositions[i])addLog(s,'相手の守備変更：'+next[i].name+'、'+positionAt(t,i)+' → '+fieldPositions[i]+'。','decision');t.lineup=next;t.fieldPositions=fieldPositions;}
-  function cpuBefore(s) {const t=s.teams.away,runners=s.bases.filter(Boolean).length,gap=s.score.away-s.score.home,type=opponentType(s);if(s.half==='home'){cpuDefense(s);const p=currentPitcher(s),b=currentBatter(s),f=fatigue(p);const leverage=s.inning>=8&&Math.abs(gap)<=2;const options=t.pitchers.map((p,i)=>({p,i})).filter(x=>!t.usedPitchers.includes(x.i));const rate=x=>x.p.stuff+(type==='defense'?x.p.control*.8:type==='power'?x.p.control*.35:x.p.control*.55)+(x.p.hand===b.hand?(type==='defense'?18:14):0)+(leverage&&runners&&s.outs<2?x.p.stuff*(type==='defense'?.16:.12):0)+(s.inning===9&&gap>0&&gap<=3&&x.i===3?30:0)-(s.inning<9&&x.i===3?20:0);options.sort((a,b)=>rate(b)-rate(a));const closer=s.inning===9&&gap>0&&gap<=3&&!t.usedPitchers.includes(3);const tired=type==='defense'?(f>=.97||(leverage&&f>=.88&&runners>0&&s.outs<2)):type==='power'?(f>=1.12||(leverage&&f>=1.03&&runners>0&&s.outs<2)):(f>=1.03||(leverage&&f>=.95&&runners>0&&s.outs<2));const matchupFloor=type==='defense'?.55:.7,matchupGap=type==='defense'?10:type==='power'?26:18;const matchup=leverage&&runners>=2&&f>=matchupFloor&&options.length&&rate(options[0])>rate({p,i:t.pitcherIndex})+matchupGap;if(options.length&&(closer||tired||matchup))changePitcher(s,'away',options[0].i);}else{const b=currentBatter(s),p=currentPitcher(s),pos=positionAt(t,t.order);const urgent=s.inning>=8&&gap<=0,opportunity=runners>0&&Math.abs(gap)<=2;if(!urgent&&!(s.inning>=7&&opportunity))return;const protectedStarter=type==='power'?b.power>=82:type==='defense'?(b.contact>=68||b.power>=78):(b.contact>=70||b.power>=75);if(protectedStarter)return;const needPower=-gap>runners+1||s.outs===2;const rate=x=>type==='power'?x.contact*.45+x.power*1.05+x.eye*.12+(x.hand!==p.hand?8:0):type==='defense'?x.contact*1.05+x.power*.2+x.eye*.35+(x.hand!==p.hand?10:0):x.contact*(needPower?.65:1)+x.power*(needPower?.85:.35)+x.eye*(runners>0?.3:.15)+(x.hand!==p.hand?10:0)+(s.outs===0&&runners===1?x.bunt*.12:0);const options=t.bench.filter(candidate=>{if(gap>0&&s.inning>=8&&pos!=='指'){const maxDrop=type==='defense'?5:type==='power'?22:15;if(effectiveDefense(candidate,pos)<effectiveDefense(b,pos)-maxDrop)return false;}const trial={...t,lineup:t.lineup.map((x,i)=>i===t.order?candidate:x),bench:t.bench.filter(x=>x.id!==candidate.id)};return !!defensivePlan(trial);}).sort((a,b)=>rate(b)-rate(a));const threshold=type==='power'?(urgent?4:14):type==='defense'?(urgent?14:28):(urgent?9:20);if(options.length&&rate(options[0])>rate(b)+threshold){const incoming=options[0];t.bench=t.bench.filter(x=>x.id!==incoming.id);t.removed.push(b);t.lineup[t.order]=incoming;addLog(s,'相手の代打：'+b.name+' → '+incoming.name+'。'+(pos!=='指'&&!incoming.pos.includes(pos)?'次の守備で配置を調整します。':''),'decision');}}}
+  function cpuDefense(s) {const t=s.teams.away,type=opponentType(s),lead=s.score.away-s.score.home;const protect=type==='defense'?(s.inning>=7&&lead>0||s.inning>=8&&lead===0):type==='power'?(s.inning>=9&&lead>0):(s.inning>=8&&lead>0);const plan=defensivePlan(t,protect);if(!plan)return;const chosen=new Set(plan.picks.map(x=>x.p.id));chosen.add(t.lineup[plan.dh].id);const incoming=plan.picks.filter(x=>!t.lineup.some(p=>p.id===x.p.id)).map(x=>x.p);const next=t.lineup.slice();for(let i=0;i<9;i++)if(!chosen.has(next[i].id)){const old=next[i],p=incoming.shift();next[i]=p;t.removed.push(old);t.bench=t.bench.filter(b=>b.id!==p.id);addLog(s,'相手の守備交代：'+old.name+' → '+p.name+'。','decision');}const fieldPositions=next.map((p,i)=>i===plan.dh?'指':plan.picks.find(x=>x.p.id===p.id).pos);for(let i=0;i<9;i++)if(t.lineup[i].id===next[i].id&&positionAt(t,i)!==fieldPositions[i])addLog(s,'相手の守備変更：'+next[i].name+'、'+positionAt(t,i)+' → '+fieldPositions[i]+'。','decision');t.lineup=next;t.fieldPositions=fieldPositions;}
+  function cpuBefore(s) {const t=s.teams.away,runners=s.bases.filter(Boolean).length,gap=s.score.away-s.score.home,type=opponentType(s);if(s.half==='home'){cpuDefense(s);const p=currentPitcher(s),b=currentBatter(s),f=fatigue(p);const leverage=s.inning>=8&&Math.abs(gap)<=2;const options=t.pitchers.map((p,i)=>({p,i})).filter(x=>!t.usedPitchers.includes(x.i));const rate=x=>x.p.stuff+(type==='defense'?x.p.control*.8:type==='power'?x.p.control*.35:x.p.control*.55)+(x.p.hand===b.hand?(type==='defense'?18:14):0)+(leverage&&runners&&s.outs<2?x.p.stuff*(type==='defense'?.16:.12):0)+(s.inning===9&&gap>0&&gap<=3&&x.i===3?30:0)-(s.inning<9&&x.i===3?20:0);options.sort((a,b)=>rate(b)-rate(a));const closer=s.inning===9&&gap>0&&gap<=3&&!t.usedPitchers.includes(3);const tired=type==='defense'?(f>=.94||(leverage&&f>=.86&&runners>0&&s.outs<2)):type==='power'?(f>=1.12||(leverage&&f>=1.03&&runners>0&&s.outs<2)):(f>=1.03||(leverage&&f>=.95&&runners>0&&s.outs<2));const matchupFloor=type==='defense'?.52:.7,matchupGap=type==='defense'?9:type==='power'?26:18;const matchup=leverage&&runners>=2&&f>=matchupFloor&&options.length&&rate(options[0])>rate({p,i:t.pitcherIndex})+matchupGap;if(options.length&&(closer||tired||matchup))changePitcher(s,'away',options[0].i);}else{const b=currentBatter(s),p=currentPitcher(s),pos=positionAt(t,t.order);const urgent=s.inning>=8&&gap<=0,opportunity=runners>0&&Math.abs(gap)<=2;
+      const powerChance=type==='power'&&s.inning>=7&&gap<=0&&runners>0;
+      if(!urgent&&!(s.inning>=7&&opportunity)&&!powerChance)return;const protectedStarter=type==='power'?b.power>=82:type==='defense'?(b.contact>=68||b.power>=78):(b.contact>=70||b.power>=75);if(protectedStarter)return;const needPower=-gap>runners+1||s.outs===2;const rate=x=>type==='power'?x.contact*.45+x.power*1.05+x.eye*.12+(x.hand!==p.hand?8:0):type==='defense'?x.contact*1.05+x.power*.2+x.eye*.35+(x.hand!==p.hand?10:0):x.contact*(needPower?.65:1)+x.power*(needPower?.85:.35)+x.eye*(runners>0?.3:.15)+(x.hand!==p.hand?10:0)+(s.outs===0&&runners===1?x.bunt*.12:0);const options=t.bench.filter(candidate=>{if(gap>0&&s.inning>=8&&pos!=='指'){const maxDrop=type==='defense'?5:type==='power'?22:15;if(effectiveDefense(candidate,pos)<effectiveDefense(b,pos)-maxDrop)return false;}const trial={...t,lineup:t.lineup.map((x,i)=>i===t.order?candidate:x),bench:t.bench.filter(x=>x.id!==candidate.id)};return !!defensivePlan(trial);}).sort((a,b)=>rate(b)-rate(a));const threshold=type==='power'?(urgent?3:powerChance?8:14):type==='defense'?(urgent?14:28):(urgent?9:20);if(options.length&&rate(options[0])>rate(b)+threshold){const incoming=options[0];t.bench=t.bench.filter(x=>x.id!==incoming.id);t.removed.push(b);t.lineup[t.order]=incoming;addLog(s,'相手の代打：'+b.name+' → '+incoming.name+'。'+(pos!=='指'&&!incoming.pos.includes(pos)?'次の守備で配置を調整します。':''),'decision');}}}
   function prepareTurn(s) {if(s.done)return [];const key=[s.plays,s.inning,s.half,batting(s).order].join(':');if(s.preparedTurn===key)return [];const start=s.log.length;cpuBefore(s);s.preparedTurn=key;s.turnChanges=s.log.slice(start).filter(l=>l.kind==='decision');return s.turnChanges;}
   // An intentional walk never consumes a pitch or a random draw.
   function intentionalWalk(s) {

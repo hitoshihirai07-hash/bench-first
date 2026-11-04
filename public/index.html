@@ -24,13 +24,14 @@
   <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css?v=09">
   <script src="./engine.js?v=11" defer></script><script src="./motion.js?v=07" defer></script><script src="./sharing.js?v=07" defer></script><script src="./scenario-stats.js?v=02" defer></script><script src="./replay-compare.js?v=02" defer></script><script src="./custom-scenarios.js?v=01" defer></script><script src="./app.js?v=13" defer></script>
+  <link rel="stylesheet" href="./site-info.css?v=01">
 </head>
 <body>
   <header class="header"><div class="brand"><img src="./assets/icon.svg" alt="" width="36" height="36"><h1>ベンチからの一手</h1><span class="tagline">采配で、もうひとつのドラマを。</span></div><div class="header-actions"><button id="help" class="small-button">遊び方</button><button id="restart" class="small-button orange-outline">はじめから</button></div></header>
   <main>
     <section id="start-screen" class="start-screen" aria-labelledby="start-title">
       <div class="start-visual"><img src="./assets/stadium.png" alt="采配を待つ球場"></div>
-      <div class="start-content"><p class="start-eyebrow">終盤の一手を、あなたが選ぶ。</p><h2 id="start-title">代打か、続投か。<br>監督になって、勝負しよう。</h2><p>架空のチーム「サンライズ」を指揮する采配ゲーム。<br>場面を選んで、9回終了まで戦います。</p><div class="start-actions"><button id="choose-scenario" class="primary">場面を選んで始める</button><button id="start-today" class="daily-button">今日の共通のお題</button><button id="start-custom" class="small-button orange-outline">自由シナリオを作る</button><button id="start-stats" class="small-button">シナリオ別戦績</button><button id="resume-game" class="small-button" hidden>続きから遊ぶ</button></div><p id="saved-version-note" class="record-caption warning" hidden>以前の版の保存位置があります。修正版の共通のお題は「今日の共通のお題」から新しく開始してください。</p><small>タイミング操作は不要。選手の能力を見て、作戦を選ぼう。</small></div>
+      <div class="start-content"><p class="start-eyebrow">終盤の一手を、あなたが選ぶ。</p><h2 id="start-title">代打か、続投か。<br>監督になって、勝負しよう。</h2><p>架空のチーム「サンライズ」を指揮する采配ゲーム。<br>場面を選んで、9回終了まで戦います。</p><div class="start-actions"><button id="choose-scenario" class="primary">場面を選んで始める</button><button id="start-today" class="daily-button">今日の共通のお題</button><button id="start-custom" class="small-button orange-outline">自由シナリオを作る</button><button id="start-stats" class="small-button">シナリオ別戦績</button><button id="resume-game" class="small-button" hidden>続きから遊ぶ</button></div><p id="saved-version-note" class="record-caption warning" hidden>以前の版の保存位置があります。修正版の共通のお題は「今日の共通のお題」から新しく開始してください。</p><small>タイミング操作は不要。選手の能力を見て、作戦を選ぼう。</small><p class="site-parent-note"><a href="https://pro-baseball-watch-guide.com/">プロ野球観戦メモ</a>の関連コンテンツとして公開しています。</p></div>
     </section>
     <div id="game-view" hidden>
     <section id="scoreboard" class="scoreboard" aria-label="試合状況"></section>
@@ -51,7 +52,7 @@
     <section class="recent"><h2>最近のプレー</h2><div id="recent" aria-live="polite" aria-atomic="true"></div></section>
     <nav id="mobile-controls" aria-label="試合の操作"><span id="mobile-status"></span><button id="mobile-tactics" class="primary" data-mobile-tab="tactics">采配</button><button id="mobile-bench" class="small-button orange-outline" data-mobile-tab="bench">交代</button><button id="mobile-record" class="small-button" data-mobile-tab="record">記録</button></nav>
     </div>
-    <footer><a href="https://pro-baseball-watch-guide.com/" target="_blank" rel="noopener">プロ野球観戦メモ</a><span>架空の球団・選手によるゲーム · 試作版 0.8</span><span id="save-status"></span></footer>
+    <footer><span class="footer-publisher">運営：<a href="https://pro-baseball-watch-guide.com/">プロ野球観戦メモ</a></span><nav class="footer-links" aria-label="サイト情報"><a href="./about.html">ゲームについて・免責事項</a><a href="./privacy.html">プライバシーポリシー</a><a href="https://pro-baseball-watch-guide.com/contact">お問い合わせ</a></nav><span>架空の球団・選手によるゲーム · 試作版 0.8</span><span id="save-status"></span></footer>
   </main>
   <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
   <dialog id="command-dialog" aria-labelledby="command-dialog-title"><div id="command-dialog-content"><div class="command-dialog-bar"><div class="command-dialog-heading"><h2 id="command-dialog-title">采配を選ぶ</h2><button id="close-command" class="small-button" aria-label="采配・交代の画面を閉じる">閉じる</button></div><p id="command-context"></p></div></div></dialog>

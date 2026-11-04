@@ -1,0 +1,19 @@
+/* ベンチからの一手：運営情報ページとゲーム内案内の追加スタイル */
+.info-brand{font-size:24px;font-weight:850;letter-spacing:-.04em;text-decoration:none}
+.info-return{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.info-main{max-width:880px;margin:24px auto 42px;padding:clamp(22px,4vw,44px);border:1px solid var(--line);border-radius:16px;background:#fff}
+.info-eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;color:var(--orange);margin-bottom:12px}
+.info-main h1{font-size:clamp(24px,4vw,34px);line-height:1.45;margin-bottom:14px}
+.info-lead{font-size:14px;line-height:1.9;color:var(--muted);margin-bottom:28px}
+.info-section{border-top:1px solid var(--line);padding:22px 0}
+.info-section h2{font-size:18px;line-height:1.5;margin-bottom:12px}
+.info-section p{font-size:14px;line-height:1.95;margin:0 0 12px}
+.info-section p:last-child{margin-bottom:0}
+.info-section a,.info-footer a,.site-parent-note a{color:#b44d17;text-decoration:underline;text-underline-offset:3px}
+.info-date{font-size:12px;color:var(--muted);margin-top:12px}
+.info-footer{max-width:930px;margin:0 auto 30px;padding:8px 24px;display:flex;flex-wrap:wrap;gap:12px 20px;font-size:12px;color:var(--muted)}
+.site-parent-note{margin-top:12px!important;font-size:11px!important;line-height:1.7;color:var(--muted)}
+footer .footer-publisher{font-size:11px}
+footer .footer-links{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+footer .footer-links a{font-size:11px;text-underline-offset:2px}
+@media(max-width:720px){.info-brand{font-size:18px}.info-main{margin:12px;max-width:none;padding:20px 18px}.info-section{padding:20px 0}.info-main h1{font-size:26px}.info-section p{font-size:13px}.info-footer{padding:8px 18px}footer .footer-links{width:100%}#save-status{margin-left:0}}
