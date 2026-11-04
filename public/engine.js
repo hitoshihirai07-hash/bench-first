@@ -6,10 +6,10 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const VERSION = 2;
-  const BALANCE_REVISION = '06';
+  const BALANCE_REVISION = '05';
   const opponentTypes = {
     balanced:{name:'バランス型',strength:'打撃・守備・投手の偏りが少なく、状況に応じて戦う。',weakness:'突出した強みはないため、打者・投手の相性が重要。',tip:'選手の能力と試合状況を見て、強攻・代打・継投を使い分ける。'},
-    power:{name:'長打型',strength:'主軸と代打に長打力があり、好機では強攻を選びやすい。',weakness:'守備範囲・走力・投手の制球が弱く、接戦の守りが課題。',tip:'走者をためて一発を狙う。終盤は強打者の代打を積極的に使うが、先発を長めに起用する。'},
+    power:{name:'長打型',strength:'主軸と代打に長打力があり、好機では強攻を選びやすい。',weakness:'守備範囲・走力・投手の制球が弱く、接戦の守りが課題。',tip:'走者をためて強攻で一発を狙う。終盤は長打力のある代打を積極的に使うが、先発を長めに起用する。'},
     defense:{name:'守備・継投型',strength:'捕手・二遊間の守備と、救援陣の球威・制球が強み。',weakness:'長打力が控えめで大量点には向かない。',tip:'接戦の終盤では守備固めや早めの継投を優先し、強攻は追う展開に絞る。'}
   };
   function opponentType(value='balanced') {
