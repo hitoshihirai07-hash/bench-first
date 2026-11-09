@@ -66,3 +66,33 @@
 .custom-saved-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:10px 0;border-bottom:1px solid var(--line)}
 .custom-saved-row>div{flex:1 1 180px;min-width:0}.custom-saved-row strong{display:block;overflow-wrap:anywhere}.custom-saved-row small{display:block;color:var(--muted);margin-top:4px}
 @media(max-width:520px){.custom-grid{grid-template-columns:1fr}.custom-form .dialog-actions{display:grid;grid-template-columns:1fr}.custom-saved-row .small-button{flex:1}}
+
+/* 試合中の相手チーム特徴。既存のCPU・試合結果ロジックは変更しない。 */
+.scoreboard .team-feature-toggle{
+  display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;
+  max-width:100%;margin-top:4px;padding:5px 7px;min-height:30px;
+  border:1px solid #b9d8e4;border-radius:7px;
+  background:#f3fbff;color:#245877;font-size:11px;font-weight:700;
+  text-align:right;line-height:1.35;white-space:normal
+}
+.scoreboard .team-feature-toggle:hover,
+.scoreboard .team-feature-toggle[aria-expanded="true"]{
+  background:#e6f5fc;border-color:#5994ad
+}
+.team-feature-panel{
+  margin:-6px 0 14px;padding:12px 16px;
+  background:#f8fcff;border:1px solid #c8dfe9;
+  border-left:3px solid #4c90b0;border-radius:9px;
+  color:var(--ink);font-size:12px;line-height:1.6
+}
+.team-feature-panel[hidden]{display:none}
+.team-feature-panel>strong{display:block;margin-bottom:7px;font-size:13px}
+.team-feature-panel dl{display:grid;gap:7px;margin:0}
+.team-feature-panel dl>div{display:grid;grid-template-columns:90px minmax(0,1fr);gap:10px}
+.team-feature-panel dt{font-weight:700;color:#41677a}
+.team-feature-panel dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:720px){
+  .scoreboard .team-feature-toggle{padding:4px 5px;font-size:10px;min-height:28px}
+  .team-feature-panel{margin:-3px 0 9px;padding:10px 12px;font-size:11px}
+  .team-feature-panel dl>div{grid-template-columns:75px minmax(0,1fr);gap:8px}
+}

@@ -5,7 +5,7 @@
   let game,tab='tactics',selected='contact',busy=false,benchMode='pinch',benchTarget=7,storageOK=true,toastTimer,lineupTeam='home';
   let animationSpeed='normal',imageURL=null,imageJob=0;
   let activeGame=false,hasSavedGame=false;
-  let selectedOpponent='balanced';
+  let selectedOpponent='balanced',teamFeatureOpen=false;
   const mobileMedia=window.matchMedia('(max-width:720px)'),commandPanel=document.querySelector('.command-panel'),commandDialog=$('command-dialog');
   let commandDraft=null,pendingDefense=null;
   const icons={
@@ -64,7 +64,32 @@
   function fatigueText(p){const f=G.fatigue(p);return f>=1?'疲労 大':f>=.8?'疲労 やや大':f>=.55?'疲労 中':'疲労 小';}
   function resultTitle(){return game.result==='win'?'采配が、勝利につながった。':game.result==='loss'?'次の一手で、取り返そう。':'最後まで、譲らない戦い。';}
   function renderScore(){
-    $('scoreboard').innerHTML='<div class="team"><div class="team-symbol" aria-hidden="true">S</div><div><h2>サンライズ</h2><small>あなたのチーム · 後攻</small></div></div><div class="score-center"><div class="score-number" aria-label="サンライズ '+game.score.home+'点、ブルーウェーブ '+game.score.away+'点"><b>'+game.score.home+'</b><i>−</i><b>'+game.score.away+'</b></div><div class="score-detail"><div class="inning">'+(game.done?'試合終了':G.halfName(game))+'</div><div class="outs">'+(game.done?'9回終了':game.outs+'アウト '+[0,1].map(i=>'<span class="out-dot '+(i<game.outs?'on':'')+'"></span>').join(''))+'</div></div><div class="bases-mini" aria-hidden="true">'+game.bases.map(p=>'<span class="'+(p?'on':'')+'"></span>').join('')+'</div></div><div class="team away"><div><h2>ブルーウェーブ</h2><small>CPU · 先攻 · '+G.opponentInfo(game).name+'</small></div><div class="team-symbol" aria-hidden="true">W</div></div>';
+    $('scoreboard').innerHTML='<div class="team"><div class="team-symbol" aria-hidden="true">S</div><div><h2>サンライズ</h2><small>あなたのチーム · 後攻</small></div></div><div class="score-center"><div class="score-number" aria-label="サンライズ '+game.score.home+'点、ブルーウェーブ '+game.score.away+'点"><b>'+game.score.home+'</b><i>−</i><b>'+game.score.away+'</b></div><div class="score-detail"><div class="inning">'+(game.done?'試合終了':G.halfName(game))+'</div><div class="outs">'+(game.done?'9回終了':game.outs+'アウト '+[0,1].map(i=>'<span class="out-dot '+(i<game.outs?'on':'')+'"></span>').join(''))+'</div></div><div class="bases-mini" aria-hidden="true">'+game.bases.map(p=>'<span class="'+(p?'on':'')+'"></span>').join('')+'</div></div><div class="team away"><div><h2>ブルーウェーブ</h2><small>CPU · 先攻</small><button type="button" id="team-feature-toggle" class="team-feature-toggle" aria-controls="team-feature-panel" aria-expanded="'+teamFeatureOpen+'" aria-label="相手チーム '+esc(G.opponentInfo(game).name)+' の特徴を表示">'+esc(G.opponentInfo(game).name)+' <span aria-hidden="true">'+(teamFeatureOpen?'▲':'▼')+'</span></button></div><div class="team-symbol" aria-hidden="true">W</div></div>';
+
+    renderTeamFeature();
+  }
+  function renderTeamFeature(){
+    const score=$('scoreboard'),info=G.opponentInfo(game);
+    let panel=$('team-feature-panel');
+    if(!panel){
+      panel=document.createElement('section');
+      panel.id='team-feature-panel';
+      panel.className='team-feature-panel';
+      panel.setAttribute('aria-label','相手チームの特徴');
+      score.insertAdjacentElement('afterend',panel);
+    }
+    panel.hidden=!teamFeatureOpen;
+    panel.innerHTML='<strong>ブルーウェーブ · '+esc(info.name)+'</strong><dl>'+
+      '<div><dt>強み</dt><dd>'+esc(info.strength)+'</dd></div>'+
+      '<div><dt>弱み</dt><dd>'+esc(info.weakness)+'</dd></div>'+
+      '<div><dt>戦い方のヒント</dt><dd>'+esc(info.tip)+'</dd></div></dl>';
+    const toggle=$('team-feature-toggle');
+    toggle.onclick=()=>{
+      teamFeatureOpen=!teamFeatureOpen;
+      panel.hidden=!teamFeatureOpen;
+      toggle.setAttribute('aria-expanded',String(teamFeatureOpen));
+      toggle.querySelector('[aria-hidden]').textContent=teamFeatureOpen?'▲':'▼';
+    };
   }
   function playerButton(p,extra=''){return '<button class="player-link '+extra+'" data-player="'+p.id+'" aria-label="'+esc(p.name)+'の能力">'+esc(p.name)+'</button>';}
   function bindPlayerDetails(){document.querySelectorAll('[data-player]').forEach(el=>el.onclick=()=>{if(!busy)showPlayer(el.dataset.player);});}
@@ -280,6 +305,7 @@
     clearEntry();
     const attempt=String(Date.now())+'-'+Math.floor(Math.random()*100000);
     const seed=retry&&Number.isSafeInteger(retry.seed)?retry.seed:Date.now()+Math.floor(Math.random()*100000);
+    teamFeatureOpen=false;
     game=dailyDate?G.createDailyGame(dailyDate,attempt):G.createGame(scenario,seed,{opponent,custom:customSpec});
     if (!dailyDate) game.replaySeed=seed;
     if (retry?.previous) {
