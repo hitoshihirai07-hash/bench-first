@@ -7,7 +7,7 @@
   'use strict';
   const KEY = 'bench-first-custom-scenarios-v1';
   const MAX_SAVED = 12;
-  const opponents = ['balanced', 'power', 'defense'];
+  const opponents = ['balanced', 'power', 'defense', 'mobility'];
   const defaultSpec = Object.freeze({ inning: 9, half: 'home', outs: 2, home: 2, away: 4, bases: [true, true, true], order: 3, pitches: 100, opponent: 'balanced' });
   function integer(value, label, min, max) {
     const v = typeof value === 'string' ? value.trim() : value;
@@ -52,7 +52,7 @@
       '<label>現在の打順<select name="order">' + options(order,n.order) + '</select></label></div>' +
       '<fieldset class="custom-bases"><legend>走者配置</legend>' + ['一塁','二塁','三塁'].map((label,i) => '<label><input name="base' + i + '" type="checkbox"' + (n.bases[i] ? ' checked' : '') + '> ' + label + '</label>').join('') + '</fieldset>' +
       '<div class="custom-grid"><label>マウンドの投手の球数<select name="pitches">' + options([[70,'70球（余力あり）'],[100,'100球（疲労あり）'],[125,'125球（疲労大）']],n.pitches) + '</select></label>' +
-      '<label>相手CPU<select name="opponent">' + options([['balanced','バランス型'],['power','長打型'],['defense','守備・継投型']],n.opponent) + '</select></label></div>' +
+      '<label>相手CPU<select name="opponent">' + options([['balanced','バランス型'],['power','長打型'],['defense','守備・継投型'],['mobility','機動力型']],n.opponent) + '</select></label></div>' +
       '<p class="record-caption">打順は現在攻撃しているチームの打者です。投手の球数は守備側（マウンド上）の投手に適用します。</p>' +
       '<label class="custom-name">保存名（任意）<input name="name" type="text" maxlength="32" placeholder="例：9回裏の逆転チャンス" value="' + htmlEscape(name) + '"></label>' +
       '<p id="custom-preview" class="custom-preview" aria-live="polite"></p><p id="custom-error" class="warning" role="alert" aria-live="polite"></p>' +

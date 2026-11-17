@@ -6,7 +6,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
   const results = ['win', 'loss', 'draw'];
-  const opponentKeys = ['balanced', 'power', 'defense'];
+  const opponentKeys = ['balanced', 'power', 'defense', 'mobility'];
   function empty() { return { win: 0, loss: 0, draw: 0, total: 0 }; }
   function add(stats, result) { stats[result]++; stats.total++; }
   function summarize(history, scenarios, currentRevision) {
