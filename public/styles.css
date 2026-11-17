@@ -96,3 +96,6 @@
   .team-feature-panel{margin:-3px 0 9px;padding:10px 12px;font-size:11px}
   .team-feature-panel dl>div{grid-template-columns:75px minmax(0,1fr);gap:8px}
 }
+/* 初めて遊ぶ方向けのシナリオ目印。 */
+.scenario-recommended{border-color:#efb793;background:var(--soft)}
+.scenario-first{color:#ad481c!important;font-weight:800}

@@ -18,7 +18,9 @@ const snapshot=p=>p.evaluate(()=>JSON.parse(localStorage.getItem('bench-first-ga
 async function start(p,key){await p.locator('#choose-scenario').click();await p.locator('[data-scenario="'+key+'"]').click();assert.equal(await p.locator('#game-view').isVisible(),false);assert.match(await p.locator('.daily-card').innerText(),/難易度/);await p.locator('#scene-start').click();await p.locator('#animation-speed').selectOption('none');}
 try{
   const p=await page();assert.match(await p.title(),/ベンチからの一手/);assert(await p.locator('#start-screen').isVisible());assert.equal(await p.locator('#game-view').isVisible(),false);assert.equal(await p.locator('#scoreboard').textContent(),'');assert.equal(await snapshot(p),null);
-  await p.locator('#choose-scenario').click();assert.equal(await p.locator('.scenario .difficulty').count(),9);await p.locator('[data-scenario="last"]').click();await p.locator('#close-dialog').click();assert.equal(await p.locator('#game-view').isVisible(),false);flows++;
+  assert.match(await p.locator('#start-screen .start-content').innerText(),/場面を選ぶ.*采配を決める.*結果を見る/);
+  assert.doesNotMatch(await p.locator('footer').innerText(),/試作版/);
+  await p.locator('#choose-scenario').click();assert.equal(await p.locator('.scenario .difficulty').count(),9);assert.equal(await p.locator('.scenario').first().getAttribute('data-scenario'),'advance');assert.match(await p.locator('.scenario').first().innerText(),/初めての方におすすめ/);await p.locator('[data-scenario="last"]').click();await p.locator('#close-dialog').click();assert.equal(await p.locator('#game-view').isVisible(),false);flows++;
   for(const key of ['chase','tie','lead','advance','ace','last','miracle','protect','squeeze']){
     const p=await page();await start(p,key);const initial=await snapshot(p);assert.equal(initial.scenario,key);assert(await p.locator('#matchup').isVisible());
     if(key==='chase'){
