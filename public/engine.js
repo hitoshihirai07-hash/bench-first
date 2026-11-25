@@ -205,8 +205,8 @@
   function fieldDefense(t) {return t.lineup.reduce((sum,p,i)=>sum+(effectiveDefense(p,positionAt(t,i))||0),0)/8;}
   function fatigue(p) { return clamp(p.pitches/p.stamina,0,2); }
   function catcherArm(t) {const i=t.lineup.findIndex((_,i)=>positionAt(t,i)==='捕'),c=t.lineup[i];return c?c.defense*(c.pos.includes('捕')?1:.4):0;}
-  function probabilities(s, attack='contact', defend='normal') {
-    const b=currentBatter(s),p=currentPitcher(s),f=Math.max(0,fatigue(p)-.85),same=b.hand===p.hand;
+  function probabilities(s, attack='contact', defend='normal',b=currentBatter(s)) {
+    const p=currentPitcher(s),f=Math.max(0,fatigue(p)-.85),same=b.hand===p.hand;
     let hit=.240+(b.contact-65)*.0040-(p.stuff-75)*.0024-(p.control-70)*.0008+f*.10+(same?-.016:.010);
     let hr=.027+(b.power-60)*.00075-(p.stuff-75)*.0005-(p.control-70)*.0002+f*.015;
     let k=.225+(p.stuff-75)*.0028-(b.contact-65)*.0022+(same?.016:0)-f*.045;
@@ -254,11 +254,11 @@
       (!!s.bases[0]!==!!s.bases[1]))return 'bunt';
     return usual;
   }
-  function matchupProbabilities(s,action) {
+  function matchupProbabilities(s,action,batter) {
     const offense=s.half==='home';
     const attack=offense?action:cpuAttackChoice(s);
     const defend=offense?(s.bases[0]&&s.outs<2?'low':'normal'):action;
-    return probabilities(s,attack,defend);
+    return probabilities(s,attack,defend,batter);
   }
   function finish(s) {s.done=true;s.result=s.score.home>s.score.away?'win':s.score.home<s.score.away?'loss':'draw';addLog(s,s.result==='win'?'試合終了。サンライズの勝利！':s.result==='loss'?'試合終了。惜しくも敗戦。':'試合終了。9回を終えて引き分け。','end');}
   function scoreRun(s,runner) {if(s.inning===9&&s.half==='home'&&s.score.home>s.score.away)return false;s.score[s.half]++;s.lines[s.half][s.inning-1]=(s.lines[s.half][s.inning-1]||0)+1;if(s.lastPlay&&runner)s.lastPlay.scored.push(runner.id);return true;}

@@ -87,3 +87,25 @@ test('tomorrow last-chance mission has distinct winning decisions, not duplicate
     }
   assert(wins.size>=2,'winning strategy profiles repeat the same actual decision');
 });
+test('previewing pinch hitters preserves the replay and matches actual substitutions',()=>{
+  for(const opponent of Object.keys(G.opponentTypes)){
+    for(const scenario of ['chase','last']){
+      const start=()=>G.createGame(scenario,1024,{opponent});
+      const previewed=start(),control=start();
+      for(const candidate of previewed.teams.home.bench){
+        const substituted=start();
+        assert(G.replacePlayer(substituted,substituted.teams.home.order,candidate.id));
+        for(const action of ['contact','power']){
+          assert.deepEqual(G.matchupProbabilities(previewed,action,candidate),G.matchupProbabilities(substituted,action));
+        }
+      }
+      assert.deepEqual(previewed,control);
+      while(!control.done){
+        const action=control.half==='home'?'power':'normal';
+        assert(G.step(control,action).ok);
+        assert(G.step(previewed,action).ok);
+      }
+      assert.deepEqual(previewed,control);
+    }
+  }
+});

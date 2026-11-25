@@ -100,6 +100,20 @@
     const rows=pitching?[['球威',p.stuff],['制球',p.control],['スタミナ目安',p.stamina+'球'],['現在の球数',p.pitches+'球'],['疲労',fatigueText(p)]]:[['ミート',p.contact],['長打',p.power],['走力',p.speed],['守備',p.defense],['選球眼',p.eye],['バント',p.bunt]];
     openDialog(dialogHead(p.name)+'<p class="dialog-text">'+p.hand+(pitching?'投げ':'打ち · 守備適性 '+p.pos.join('・'))+' / '+p.trait+'</p><table class="ability-table"><tbody>'+rows.map(([label,value])=>'<tr><th>'+label+'</th><td>'+value+'</td></tr>').join('')+'</tbody></table><p class="dialog-text">'+(pitching?'球威は三振や被安打、制球は四球に影響します。球数がスタミナ目安に近づくほど疲労が増え、打たれやすくなります。':'能力は100段階。選球眼が高いと四球を選びやすく、バント能力が高いと送りバントの成功率が上がります。守備適性外の位置では守備力が下がります。')+'</p>');
   }
+  function pinchHitComparison(current,candidate){
+    const cell=(action,batter)=>{
+      const p=G.matchupProbabilities(game,action,batter);
+      const hit=p.single+p.double+p.triple+p.hr;
+      return '<td>安打 '+(hit*100).toFixed(1)+'%<br>本塁打 '+(p.hr*100).toFixed(1)+'%</td>';
+    };
+    const rows=[['contact','ミート重視'],['power','長打狙い']].map(([action,label])=>
+      '<tr><th scope="row">'+label+'</th>'+cell(action,current)+cell(action,candidate)+'</tr>'
+    ).join('');
+    return '<table class="comparison"><caption>対 '+esc(G.currentPitcher(game).name)+' · この打席の目安</caption>'+
+      '<thead><tr><th scope="col">作戦</th><th scope="col">現在の打者<br>'+esc(current.name)+'</th>'+
+      '<th scope="col">代打候補<br>'+esc(candidate.name)+'</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+      '<p class="record-caption">安打の確率には本塁打を含みます。</p>';
+  }
   function comparison(old,p,pos,pitching=false){
     const rows=pitching?[['球威',old.stuff,p.stuff],['制球',old.control,p.control],['スタミナ目安（球）',old.stamina,p.stamina],['現在の球数',old.pitches,p.pitches],['疲労',fatigueText(old),fatigueText(p)]]:[['ミート',old.contact,p.contact],['長打',old.power,p.power],['走力',old.speed,p.speed],['選球眼',old.eye,p.eye],['バント',old.bunt,p.bunt],['守備の基礎値',old.defense,p.defense],['配置先（'+pos+'）の守備',G.effectiveDefense(old,pos)??'守備なし',G.effectiveDefense(p,pos)??'守備なし']];
     return '<table class="comparison"><caption>交代前後の比較</caption><thead><tr><th>能力</th><th>'+esc(old.name)+'</th><th>'+esc(p.name)+'</th><th>変化</th></tr></thead><tbody>'+rows.map(([label,a,b])=>{const delta=typeof a==='number'&&typeof b==='number'?b-a:null;return '<tr><th>'+label+'</th><td>'+a+'</td><td>'+b+'</td><td class="'+(delta>0?'delta-up':delta<0?'delta-down':'')+'">'+(delta===null?'—':delta>0?'＋'+delta:delta===0?'±0':String(delta).replace('-','−'))+'</td></tr>';}).join('')+'</tbody></table><p class="record-caption">数値の増減を表示しています。球数は少ないほど疲労に余裕があります。</p>';
@@ -168,7 +182,8 @@
     if($('bench-target')){$('bench-target').value=String(benchTarget);$('bench-target').onchange=e=>{benchTarget=Number(e.target.value);renderBench();bindPlayerDetails();};}
     document.querySelectorAll('[data-sub]').forEach(el=>el.onclick=()=>{
       const candidate=home.bench.find(p=>p.id===el.dataset.sub);const old=home.lineup[benchTarget];
-      showConfirm('選手を交代しますか？',old.name+' → '+candidate.name+'。交代した選手は再出場できません。'+(G.positions[benchTarget]!=='指'&&!candidate.pos.includes(G.positions[benchTarget])?' '+G.positions[benchTarget]+'は守備適性外のため、守備力が下がります。':''),()=>{G.replacePlayer(game,benchTarget,candidate.id,benchMode);save();render();toast('交代しました。采配を選んで進めましょう。');},comparison(old,candidate,G.positions[benchTarget]));
+      const preview=benchMode==='pinch'?pinchHitComparison(old,candidate):'';
+      showConfirm('選手を交代しますか？',old.name+' → '+candidate.name+'。交代した選手は再出場できません。'+(G.positions[benchTarget]!=='指'&&!candidate.pos.includes(G.positions[benchTarget])?' '+G.positions[benchTarget]+'は守備適性外のため、守備力が下がります。':''),()=>{G.replacePlayer(game,benchTarget,candidate.id,benchMode);save();render();toast('交代しました。采配を選んで進めましょう。');},preview+comparison(old,candidate,G.positions[benchTarget]));
     });
     document.querySelectorAll('[data-pitcher]').forEach(el=>el.onclick=()=>{const i=Number(el.dataset.pitcher);showConfirm('投手を交代しますか？',home.pitchers[i].name+'にマウンドを託します。交代した投手は再登板できません。',()=>{G.changePitcher(game,'home',i);save();render();toast('投手を交代しました。');},comparison(home.pitchers[home.pitcherIndex],home.pitchers[i],null,true));});
     $('back-tactics').onclick=()=>switchTab('tactics');

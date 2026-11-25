@@ -13,7 +13,7 @@ await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const url='http://127.0.0.1:'+server.address().port;
 const browser=await chromium.launch({headless:true,...(process.env.BENCH_CHROMIUM_EXECUTABLE?{executablePath:process.env.BENCH_CHROMIUM_EXECUTABLE,args:['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--no-zygote']}: {})});
 let flows=0;const errors=[];
-async function page(){const context=await browser.newContext({viewport:{width:1365,height:900}});const p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});await p.goto(url);return p;}
+async function page(date){const context=await browser.newContext({viewport:{width:1365,height:900}});const p=await context.newPage();p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});if(date)await p.clock.setFixedTime(new Date(date));await p.goto(url);return p;}
 const snapshot=p=>p.evaluate(()=>JSON.parse(localStorage.getItem('bench-first-game-v1')));
 async function start(p,key){await p.locator('#choose-scenario').click();await p.locator('[data-scenario="'+key+'"]').click();assert.equal(await p.locator('#game-view').isVisible(),false);assert.match(await p.locator('.daily-card').innerText(),/難易度/);await p.locator('#scene-start').click();await p.locator('#animation-speed').selectOption('none');}
 try{
@@ -24,7 +24,25 @@ try{
   for(const key of ['chase','tie','lead','advance','ace','last','miracle','protect','squeeze']){
     const p=await page();await start(p,key);const initial=await snapshot(p);assert.equal(initial.scenario,key);assert(await p.locator('#matchup').isVisible());
     if(key==='chase'){
-      await p.locator('#tab-bench').click();await p.locator('[data-sub="h10"]').click();await p.locator('#confirm').click();assert.match(await p.locator('#matchup').innerText(),/白石/);await p.locator('#tab-tactics').click();
+      await p.locator('#tab-bench').click();
+      const candidate=p.locator('[data-sub="h10"]');
+      await candidate.click();
+      const preview=p.getByRole('table',{name:/この打席の目安/});
+      assert.match(await preview.innerText(),/白石/);
+      const expected=await p.evaluate(s=>{
+        const G=BenchGame,home=s.teams.home;
+        const actions=['contact','power'];
+        const odds=action=>{
+          const p=G.matchupProbabilities(s,action);
+          return '安打 '+((p.single+p.double+p.triple+p.hr)*100).toFixed(1)+'%\n本塁打 '+(p.hr*100).toFixed(1)+'%';
+        };
+        const current=actions.map(odds);
+        if(!G.replacePlayer(s,home.order,'h10'))throw Error('代打交代に失敗');
+        return actions.flatMap((action,i)=>[current[i],odds(action)]);
+      },initial);
+      assert.deepEqual(await preview.locator('td').allInnerTexts(),expected);
+      await p.locator('#cancel').click();assert.deepEqual(await snapshot(p),initial);
+      await candidate.click();await p.locator('#confirm').click();assert.match(await p.locator('#matchup').innerText(),/白石/);await p.locator('#tab-tactics').click();
     }
     if(key==='ace'){
       await p.locator('#tab-bench').click();await p.locator('[data-pitcher="2"]').click();await p.locator('#confirm').click();assert.match(await p.locator('#matchup').innerText(),/速水/);await p.locator('#tab-tactics').click();
@@ -47,7 +65,7 @@ try{
   const saved=await page();await start(saved,'tie');await saved.locator('#advance').click();await saved.waitForFunction(()=>!document.querySelector('#advance').disabled);const before=await snapshot(saved);await saved.reload();assert.equal(await saved.locator('#game-view').isVisible(),false);await saved.locator('#resume-game').click();assert.deepEqual(await snapshot(saved),before);flows++;
   const link=await page();await link.goto(url+'/?scenario=ace');assert.equal(await link.locator('#game-view').isVisible(),false);assert.match(await link.locator('#dialog-content').innerText(),/難易度/);await link.locator('#entry-start').click();assert.equal((await snapshot(link)).scenario,'ace');flows++;
   const daily=await page();await daily.goto(url+'/?daily=2026-09-16&rules=02');await daily.locator('#entry-start').click();assert.equal((await snapshot(daily)).daily.date,'2026-09-16');flows++;
-  const today=await page();await today.goto(url+'/?daily=2026-10-02&rules=02');await today.locator('#entry-start').click();await today.locator('#animation-speed').selectOption('none');
+  const today=await page('2026-10-02T03:00:00Z');await today.goto(url+'/?daily=2026-10-02&rules=02');await today.locator('#entry-start').click();await today.locator('#animation-speed').selectOption('none');
   assert.equal((await snapshot(today)).daily.balanceRevision,'05');assert.match(await today.locator('#matchup').innerText(),/黒瀬/);
   const starterPreview=await today.locator('[data-action="normal"] .chance-preview').innerText();
   await today.locator('#tab-bench').click();await today.locator('[data-pitcher="1"]').click();await today.locator('#confirm').click();await today.locator('#tab-tactics').click();
@@ -73,7 +91,7 @@ try{
   await mobile.locator('#mobile-bench').click();await mobile.locator('[data-pitcher="2"]').click();await mobile.locator('#cancel').click();assert(await mobile.locator('#command-dialog').isVisible());
   await mobile.locator('[data-pitcher="2"]').click();await mobile.locator('#confirm').click();assert.equal(await mobile.locator('#command-dialog').isVisible(),false);assert.equal((await snapshot(mobile)).plays,mobileBefore.plays);assert.match(await mobile.locator('#matchup').innerText(),/速水/);
   await mobile.locator('#mobile-tactics').click();await mobile.locator('#advance').click();await mobile.waitForFunction(()=>!document.querySelector('#mobile-tactics').disabled);assert.equal(await mobile.locator('#command-dialog').isVisible(),false);assert.equal((await snapshot(mobile)).plays,mobileBefore.plays+1);
-  await mobile.setViewportSize({width:1365,height:900});assert(await mobile.locator('#panel').isVisible());await mobile.setViewportSize({width:390,height:667});assert.equal(await mobile.locator('#panel').isVisible(),false);
+  await mobile.setViewportSize({width:1365,height:900});await mobile.locator('#panel').waitFor({state:'visible'});await mobile.setViewportSize({width:390,height:667});await mobile.locator('#panel').waitFor({state:'hidden'});
   for(let n=0;n<100&&!(await snapshot(mobile)).done;n++){await mobile.locator('#mobile-tactics').click();await mobile.locator('#advance').click();await mobile.waitForFunction(()=>!document.querySelector('#mobile-tactics').disabled);}
   assert((await snapshot(mobile)).done);await mobile.locator('#result-record').click();assert(await mobile.locator('#command-dialog').isVisible());assert.match(await mobile.locator('#panel').innerText(),/あなたの采配を振り返る/);
   await mobile.reload();await mobile.locator('#resume-game').click();assert(await mobile.locator('#command-dialog').isVisible());assert.match(await mobile.locator('#panel').innerText(),/イニング別スコア/);
